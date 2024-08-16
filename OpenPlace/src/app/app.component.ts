@@ -20,7 +20,7 @@ export class AppComponent implements OnInit {
   timeoutId: number | null = null;
   zoomLevel: number = 1;
 
-  audio: HTMLAudioElement = new Audio("/assets/sfx/place.mp3");
+  audio: HTMLAudioElement = new Audio("assets/sfx/place.mp3");
 
   hoverPixel: HoverPixel = new HoverPixel(-1, -1, "");
   pixelArr: Pixel[] = [];
@@ -112,6 +112,7 @@ export class AppComponent implements OnInit {
 
   private setupWindowResizeEvent() {
     window.addEventListener('resize', () => {
+      this.zoomLevel = 1;
       this.resizeCanvas();
       this.drawAllPixels();
     });
@@ -323,7 +324,8 @@ export class AppComponent implements OnInit {
       console.log(response);
     }).catch(response => {
       if (response.message.includes("Rate limit")) {
-        this.showBubble("Wait for the next minute.", e.clientX, e.clientY);
+        const now = new Date();
+        this.showBubble(`Wait ${60 - now.getSeconds()} seconds.`, e.clientX, e.clientY);
         this.drawAllPixels();
       }
       console.log(response);
@@ -349,6 +351,8 @@ export class AppComponent implements OnInit {
   }
 
   resizeCanvas() {
+
+
     this.canvas.width = this.dimensions[0];
     this.canvas.height = this.dimensions[1];
 
@@ -358,6 +362,8 @@ export class AppComponent implements OnInit {
 
     const container = document.getElementById("palette-container");
     container!.style.width = max + 'px';
+
+
   }
 
   usernameChange(event: Event) {
@@ -373,6 +379,7 @@ export class AppComponent implements OnInit {
 
     this.calculateOrigin(rect, e.clientX, e.clientY);
     this.applyTransformations();
+
     this.drawAllPixels();
 
     const x = this.calculateXPosition(e.clientX, rect);
@@ -381,7 +388,7 @@ export class AppComponent implements OnInit {
   }
 
   private updateZoomLevel(deltaY: number): void {
-    const zoomStep = 0.01;
+    const zoomStep = 0.04;
     const minZoom = 1;
     const maxZoom = 20;
     this.zoomLevel = Math.round(Math.max(minZoom, Math.min(this.zoomLevel - deltaY * zoomStep, maxZoom)));

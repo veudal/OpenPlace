@@ -17,15 +17,14 @@
 @media (min-width: 1200px) {
   .container {
     display: flex;
+    justify-content: space-around;
     align-items: flex-start;
-    gap: 1rem;
   }
 
 
   .username-input-container {
     flex-shrink: 0;
-    margin-left: 4vw;
-    margin-bottom: 10vh;
+    margin-right: -7vw;
     width: 280px; /* Adjust width as needed */
   }
 }
@@ -42,7 +41,7 @@
 }
 
 .palette-container {
-  background-color: slategray;
+  background-color: #223a70;
   border-radius: 20px;
   padding: 8px;
   margin-top: 25px;
