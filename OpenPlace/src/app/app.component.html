@@ -1,0 +1,19 @@
+<body class="bg-gray-100 min-h-screen body p-4">
+  <div class="container">
+    <div id="div">
+      <canvas class="canvas" id="canvas"></canvas>
+      <div id="palette-container" class="palette-container"></div>
+      <span id="floating-username" style="position: absolute; white-space: nowrap;"></span>
+    </div>
+    <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
+      <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>
+      <input id="username"
+             value="{{username}}"
+             type="text"
+             (change)="usernameChange($event)"
+             placeholder="Enter your username"
+             class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 ease-in-out" />
+    </div>
+  </div>
+</body>
+<router-outlet />

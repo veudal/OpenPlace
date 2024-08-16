@@ -1,0 +1,60 @@
+.canvas {
+  display: block;
+  background-color: white;
+  image-rendering: pixelated;
+  /*  border: solid;
+  border-color: deeppink;
+  border-width: 2px;*/
+}
+
+.body {
+  display: flex;
+  justify-content: flex-end;
+  height: 98vh;
+  margin: 0;
+}
+
+@media (min-width: 1200px) {
+  .container {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+
+  .username-input-container {
+    flex-shrink: 0;
+    margin-left: 4vw;
+    margin-bottom: 10vh;
+    width: 280px; /* Adjust width as needed */
+  }
+}
+
+@media (max-width: 1199px) { /* Adjust for mobile or smaller screens */
+  .container {
+    display: block;
+    text-align: center;
+  }
+
+  #div {
+    margin-bottom: 1rem;
+  }
+}
+
+.palette-container {
+  background-color: slategray;
+  border-radius: 20px;
+  padding: 8px;
+  margin-top: 25px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-evenly;
+}
+
+.rounded {
+  border-radius: 0.5rem;
+}
+
+.transition {
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
