@@ -2,10 +2,11 @@
   display: block;
   background-color: white;
   image-rendering: pixelated;
-  /*  border: solid;
-  border-color: deeppink;
-  border-width: 2px;*/
+  touch-action: manipulation;
+  outline: none;
+  border-radius: 10px;
 }
+
 
 .body {
   display: flex;
@@ -17,14 +18,14 @@
 @media (min-width: 1200px) {
   .container {
     display: flex;
-    justify-content: space-around;
+    justify-content: space-evenly;
     align-items: flex-start;
   }
 
 
   .username-input-container {
     flex-shrink: 0;
-    margin-right: -7vw;
+    margin-top: 12vh;
     width: 280px; /* Adjust width as needed */
   }
 }
@@ -44,7 +45,6 @@
   background-color: #223a70;
   border-radius: 20px;
   padding: 8px;
-  margin-top: 25px;
   margin-bottom: 20px;
   display: flex;
   justify-content: space-evenly;

@@ -1,9 +1,13 @@
-<body class="bg-gray-100 min-h-screen body p-4">
+<head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/monolith.min.css" />
+</head>
+<body class="min-h-screen body p-4">
   <div class="container">
+    <div style="margin-right: 30px" class="color-picker"></div>
     <div id="div">
-      <canvas class="canvas" id="canvas"></canvas>
       <div id="palette-container" class="palette-container"></div>
-      <span id="floating-username" style="position: absolute; white-space: nowrap;"></span>
+      <canvas class="canvas" id="canvas"></canvas>
+      <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
     </div>
     <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
       <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>
