@@ -13,6 +13,9 @@ A reddit r/place clone (online pixel art plattform in which everyone shares one 
 - Use your scroll wheel on the canvas in order to zoom in or out on a certain point.
 - Use WASD (or the arrow keys) in order to move/navigate through the canvas. NOTE: Moving only works when the zoom level is greater than 1.
 
+. The stored username of placed pixels will not be changed with a new username.
+- The leaderboard counts by the usernames. If 2 people have the same one, all their totals will add up and be shown as one in the leaderboard.
+
 # Screenshots
 
 ![image](https://github.com/user-attachments/assets/afe227d0-0883-4d45-a5b5-ec054d879426)
