@@ -6,17 +6,31 @@
     <div style="margin-right: 30px" class="color-picker"></div>
     <div id="div">
       <div id="palette-container" class="palette-container"></div>
-      <canvas class="canvas" id="canvas"></canvas>
+      <div style="display: flex">
+        <canvas style="flex: 1" class="canvas" id="canvas"></canvas>
+        <div style="flex: 1;">
+          <ngx-slider style="margin-left: 3vw" *ngIf="isSliderVisible" id="slider" [(value)]="sliderValue" [options]="sliderOptions" (userChange)="onSliderChange()"></ngx-slider>
+        </div>
+      </div>
       <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
     </div>
-    <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
-      <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>
-      <input id="username"
-             value="{{username}}"
-             type="text"
-             (change)="usernameChange($event)"
-             placeholder="Enter your username"
-             class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 ease-in-out" />
+    <div style="height: 50%">
+      <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
+        <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>
+        <input id="username"
+               value="{{username}}"
+               type="text"
+               (change)="usernameChange($event)"
+               placeholder="Enter your username"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 ease-in-out" />
+      </div>
+      <div class="leaderboard">
+        <div class="leaderboard-header">
+          Leaderboard
+        </div>
+        <ul class="leaderboard-list" id="leaderboard-list">
+        </ul>
+      </div>
     </div>
   </div>
 </body>

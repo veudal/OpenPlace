@@ -4,7 +4,8 @@ import { Pixel } from './models/Pixel.model';
 import { HoverPixel } from './models/HoverPixel';
 import Pickr from '@simonwep/pickr';
 import { environment } from '../environments/environment';
-import { BoardSize } from './interfaces/boardSize.interface';
+import { BoardSize } from './interfaces/BoardSize.interface';
+import { Leaderboard } from './interfaces/Leaderboard.interface'
 
 @Component({
   selector: 'app-root',
@@ -28,11 +29,20 @@ export class AppComponent implements OnInit {
   hoverPixel: HoverPixel = new HoverPixel(-1, -1, "");
   pixelArr: Pixel[] = [];
   dimensions: BoardSize = { width: 256, height: 256 };
-;
+  ;
 
   originX: number = 0;
   originY: number = 0;
   selectedColor: number = 1;
+
+  sliderValue = 0;
+  isSliderVisible = false; //Has to be false until board has been loaded
+  sliderOptions = {
+    ceil: 0,
+    vertical: true,
+    showSelectionBar: true,
+    rightToLeft: true
+  };
 
   client: Client = new Client();
   databases: Databases = new Databases(this.client);
@@ -42,6 +52,7 @@ export class AppComponent implements OnInit {
 
 
   async ngOnInit() {
+
 
     this.initialize();
 
@@ -121,7 +132,8 @@ export class AppComponent implements OnInit {
     this.canvas.setAttribute('tabindex', '0');
 
     await this.initializeBoard();
-
+    this.isSliderVisible = true;
+    this.updateSlider();
   }
 
   private setupCanvasEvents() {
@@ -130,8 +142,8 @@ export class AppComponent implements OnInit {
     this.canvas.addEventListener('wheel', this.zoom.bind(this));
     this.canvas.addEventListener("mousemove", this.onHover.bind(this));
     this.canvas.addEventListener("mouseleave", this.onLeave.bind(this));
-    this.canvas.addEventListener('mouseover', () => {
-      if (!this.pickr?.isOpen()) {
+    this.canvas.addEventListener('mouseover', (e: MouseEvent) => {
+      if (!this.pickr?.isOpen() && e.buttons == 0) {
         this.canvas.focus()
       }
     });
@@ -203,10 +215,15 @@ export class AppComponent implements OnInit {
         pixel.color = color;
         pixel.placedBy = placedBy;
         pixel.timestamp = new Date($updatedAt);
-      } else {
+      }
+      else {
         this.pixelArr.push(new Pixel(x, y, color, placedBy, new Date($updatedAt)));
       }
       this.drawPixel(x, y, color);
+      this.updateLeaderboard();
+      if (this.isSliderVisible) {
+        this.updateSlider();
+      }
     });
   }
 
@@ -325,10 +342,27 @@ export class AppComponent implements OnInit {
 
     if (pixel) {
       this.hoverPixel = pixel;
-      this.playSound();
+      this.leaveHistoryMode();
       this.drawPixel(pixel.x, pixel.y, pixel.color);
       this.sendPixel(pixel.x, pixel.y, pixel.color, e);
+      this.increaseCounter();
     }
+  }
+
+  leaveHistoryMode() {
+    if (this.sliderValue != this.pixelArr.length) {
+      this.sliderValue = this.pixelArr.length;
+      this.drawBoard();
+    }
+  }
+
+  increaseCounter() {
+    const storedVal = localStorage.getItem("placedPixels");
+    let count = 1;
+    if (storedVal) {
+      count = parseInt(storedVal,) + 1;
+    }
+    localStorage.setItem("placedPixels", count.toString());
   }
 
 
@@ -350,6 +384,9 @@ export class AppComponent implements OnInit {
     this.drawHoverPixel(x, y, pixel?.color, false);
 
     if (pixel) {
+      if (!this.isHoverPixelExisting()) {
+        return;
+      }
 
       const options: Intl.DateTimeFormatOptions = {
         year: '2-digit',
@@ -390,10 +427,25 @@ export class AppComponent implements OnInit {
 
   onLeave() {
     if (this.hoverPixel) {
+      if (!this.isHoverPixelExisting()) {
+        this.hoverPixel.color = this.defaultColor;
+      }
+
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
       this.hoverPixel = new HoverPixel(-1, -1, "")
     }
     this.hideBubble(false);
+  }
+
+  isHoverPixelExisting(): boolean {
+    //Needed for history due to hoverpixels.
+    if (this.isSliderVisible && this.sliderValue != this.pixelArr.length) {
+      const i = this.pixelArr.findIndex(item => item.x === this.hoverPixel.x && item.y === this.hoverPixel.y);
+      if (this.sliderValue <= i) {
+        return false;
+      }
+    }
+    return true;
   }
 
   drawHoverPixel(x: number, y: number, color: any, force: boolean) {
@@ -401,7 +453,12 @@ export class AppComponent implements OnInit {
       this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor);
     }
     else if (this.hoverPixel.x !== x || this.hoverPixel.y !== y || force) {
+
+      if (!this.isHoverPixelExisting()) {
+        this.hoverPixel.color = this.defaultColor;
+      }
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
+
       this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor);
       this.drawPixel(x, y, this.colorPalette[this.selectedColor]);
     }
@@ -410,13 +467,20 @@ export class AppComponent implements OnInit {
 
   showBubble(text: string, clientX: number, clientY: number) {
     const div = document.getElementById("bubble")!;
-    let yOffset = div.clientHeight * 1.25;
-    if (clientY < yOffset) {
+    const rect = this.canvas.getBoundingClientRect();
+
+    let yOffset = div.clientHeight;
+    if (clientY - rect.top < yOffset) {
       yOffset = 0
     }
+    let xOffset = div.clientWidth;
+    if (clientX - rect.left < rect.width - xOffset) {
+      xOffset = 0
+    }
+
     div.style.visibility = "visible";
     div.style.opacity = "1";
-    div.style.left = `${clientX + 25}px`;
+    div.style.left = `${clientX - xOffset}px`;
     div.style.top = `${clientY - yOffset}px`;
     div.innerHTML = text;
 
@@ -429,44 +493,99 @@ export class AppComponent implements OnInit {
 
   async initializeBoard() {
 
-    let offset = 0;
     const limit = 1000;
+    let offset = 0;
 
     let result;
     do {
+
       result = await this.databases.listDocuments(
         environment.databaseId,
         environment.collectionId,
         [Query.limit(limit),
         Query.offset(offset),
-        Query.orderAsc("color"),
+        Query.orderAsc("$updatedAt"),
         ]
       );
+
 
       result.documents.forEach(document => {
         const [x, y] = document.$id.split("_").map(Number);
         const { color, placedBy, $updatedAt } = document;
-
         const pixel = this.getValidPixelOrNull(x, y, color, placedBy, new Date($updatedAt));
+
         if (pixel) {
           this.pixelArr.push(pixel);
         }
       });
+
       this.drawBoard();
       this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, true)
-
+      this.updateLeaderboard();
       offset += limit;
     }
     while (result.documents.length > 0);
 
-    //if (isDevMode()) {
-    const board = localStorage.getItem("board");
-    if (board && JSON.parse(board).length >= this.pixelArr.length) {
-      return;
-    }
-    localStorage.setItem("board", JSON.stringify(this.pixelArr));
+    this.updateLeaderboard();
 
-    //}
+
+    try {
+      const board = localStorage.getItem("board");
+      if (board && JSON.parse(board).length >= this.pixelArr.length) {
+        return;
+      }
+      localStorage.setItem("board", JSON.stringify(this.pixelArr));
+    }
+    catch {
+      console.log("Could not save board array.")
+    }
+  }
+
+
+  updateSlider() {
+    this.sliderOptions = {
+      ceil: this.pixelArr.length,
+      vertical: true,
+      showSelectionBar: true,
+      rightToLeft: true
+    };
+    this.sliderValue = this.sliderOptions.ceil;
+  }
+
+  updateLeaderboard() {
+    const leaderboard: Leaderboard[] = [];
+    for (const pixel of this.pixelArr) {
+
+      const existingEntry = leaderboard.find(item => item.name === pixel.placedBy);
+      if (existingEntry) {
+        existingEntry.placedPixels++;
+      }
+      else {
+        leaderboard.push({ name: pixel.placedBy, placedPixels: 1 });
+      }
+    };
+
+    const list = document.getElementById('leaderboard-list')!;
+    list.innerHTML = '';
+    leaderboard.sort((a, b) => b.placedPixels - a.placedPixels);
+
+    for (let i = 0; i < Math.min(10, leaderboard.length); i++) {
+      const position = i + 1;
+      const element = document.createElement('li');
+      element.className = 'leaderboard-item';
+
+      element.innerHTML = `
+        <span class="position">${position}.</span>
+        <span class="name">${leaderboard[i].name}</span>
+        <span class="score">${leaderboard[i].placedPixels}</span>
+        `;
+      list.appendChild(element);
+    }
+
+  }
+
+  onSliderChange(): void {
+    this.drawBoard();
   }
 
   getValidPixelOrNull(x: number, y: number, c: any, placedBy: any, updatedAt: any) {
@@ -489,14 +608,16 @@ export class AppComponent implements OnInit {
       return;
     }
 
+    this.playSound();
+
     const documentId = `${xCoord}_${yCoord}`;
     const data = { color, placedBy: this.username };
     const operation = pixel
       ? this.databases.updateDocument(environment.databaseId, environment.collectionId, documentId, data)
       : this.databases.createDocument(environment.databaseId, environment.collectionId, documentId, data);
 
-    operation.then(response => {
-      console.log(response);
+    operation.then(() => {
+      console.log("Success.");
     }).catch(response => {
       if (response.message.includes("Rate limit")) {
         const now = new Date();
@@ -509,10 +630,18 @@ export class AppComponent implements OnInit {
 
 
   drawBoard() {
+    let count = this.pixelArr.length;
+
+    if (this.isSliderVisible) {
+      count = this.sliderValue;
+    }
+
     this.ctx.clearRect(0, 0, this.dimensions.width, this.dimensions.height)
-    this.pixelArr.forEach((element) => {
-      this.drawPixel(element.x, element.y, element.color);
-    });
+
+    for (let i = 0; i < count; i++) {
+      const p = this.pixelArr[i];
+      this.drawPixel(p.x, p.y, p.color);
+    }
   }
 
   drawPixel(x: number, y: number, c: string) {
@@ -520,6 +649,7 @@ export class AppComponent implements OnInit {
     if (this.getValidPixelOrNull(x, y, c, null, null) == null) {
       return;
     }
+
     this.ctx.fillStyle = '#' + c;
     this.ctx.fillRect(x, y, 1, 1);
   }
@@ -541,8 +671,14 @@ export class AppComponent implements OnInit {
   }
 
   usernameChange(event: Event) {
-    this.username = (event.target as HTMLInputElement).value;
-    localStorage.setItem("username", this.username);
+    const val = (event.target as HTMLInputElement).value
+    if (val.length > 16) {
+      (event.target as HTMLInputElement).value = this.username || "";
+      alert("Username cannot be longer than 16 characters.");
+      return;
+    }
+    this.username = val;
+    localStorage.setItem("username", val);
   }
 
   zoom(e: WheelEvent) {
@@ -586,11 +722,6 @@ export class AppComponent implements OnInit {
     this.originX = Math.floor((clientX - rect.left) / rect.width * this.dimensions.width / this.zoomLevel + (1 - 1 / this.zoomLevel) * this.originX);
     this.originY = Math.floor((clientY - rect.top) / rect.height * this.dimensions.height / this.zoomLevel + (1 - 1 / this.zoomLevel) * this.originY);
 
-    //this.originX = Math.floor((clientX - rect.left) / rect.width * this.dimensions.width / this.zoomLevel + (1 - 1 / this.zoomLevel) * this.originX);
-    //this.originY = Math.floor((clientY - rect.top) / rect.height * this.dimensions.height / this.zoomLevel + (1 - 1 / this.zoomLevel) * this.originY);
-
-
-    //console.log(this.originX, this.originY)
     //this.originX = Math.round((clientX - rect.left) / rect.width * this.dimensions.width);
     //this.originY = Math.round((clientY - rect.top) / rect.height * this.dimensions.height);
   }
