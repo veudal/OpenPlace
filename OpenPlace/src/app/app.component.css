@@ -10,7 +10,7 @@
 
 .body {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   height: 98vh;
   margin: 0;
 }
@@ -18,7 +18,7 @@
 @media (min-width: 1200px) {
   .container {
     display: flex;
-    justify-content: space-evenly;
+    justify-content: space-around;
     align-items: flex-start;
   }
 

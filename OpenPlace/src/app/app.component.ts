@@ -5,7 +5,8 @@ import { HoverPixel } from './models/HoverPixel';
 import Pickr from '@simonwep/pickr';
 import { environment } from '../environments/environment';
 import { BoardSize } from './interfaces/BoardSize.interface';
-import { Leaderboard } from './interfaces/Leaderboard.interface'
+import { Leaderboard } from './interfaces/Leaderboard.interface';
+import { SignalRService } from './services/signalr.service';
 
 @Component({
   selector: 'app-root',
@@ -29,13 +30,15 @@ export class AppComponent implements OnInit {
   hoverPixel: HoverPixel = new HoverPixel(-1, -1, "");
   pixelArr: Pixel[] = [];
   dimensions: BoardSize = { width: 256, height: 256 };
-  ;
+  minZoom = 1;
+  maxZoom = Math.min(this.dimensions.width, this.dimensions.height) / 10;
 
   originX: number = 0;
   originY: number = 0;
   selectedColor: number = 1;
 
   sliderValue = 0;
+  sliderDragState = false;
   isSliderVisible = false; //Has to be false until board has been loaded
   sliderOptions = {
     ceil: 0,
@@ -50,10 +53,9 @@ export class AppComponent implements OnInit {
   canvas: any;
   ctx: any;
 
+  constructor(private signalRService: SignalRService) { }
 
   async ngOnInit() {
-
-
     this.initialize();
 
     // Set up event listeners
@@ -61,7 +63,7 @@ export class AppComponent implements OnInit {
     this.initializePaletteContainer();
     this.initializeColorPicker()
     this.setupWindowResizeEvent();
-    this.setupClientSubscription();
+    this.setupSignalR();
     this.setupDocumentEvents();
   }
 
@@ -124,16 +126,14 @@ export class AppComponent implements OnInit {
   }
 
   private async initialize() {
-    // Initialize client and canvas
-    this.client.setEndpoint(environment.endpointUrl).setProject(environment.projectId);
-
+    // Initialize canvas
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext("2d");
     this.canvas.setAttribute('tabindex', '0');
 
     await this.initializeBoard();
     this.isSliderVisible = true;
-    this.updateSlider();
+    this.setSliderToMax();
   }
 
   private setupCanvasEvents() {
@@ -143,7 +143,7 @@ export class AppComponent implements OnInit {
     this.canvas.addEventListener("mousemove", this.onHover.bind(this));
     this.canvas.addEventListener("mouseleave", this.onLeave.bind(this));
     this.canvas.addEventListener('mouseover', (e: MouseEvent) => {
-      if (!this.pickr?.isOpen() && e.buttons == 0) {
+      if (!this.pickr?.isOpen() && e.buttons == 0 && this.sliderDragState == false) {
         this.canvas.focus()
       }
     });
@@ -205,25 +205,32 @@ export class AppComponent implements OnInit {
     });
   }
 
-  private setupClientSubscription() {
-    this.client.subscribe(`databases.${environment.databaseId}.collections.${environment.collectionId}.documents`, response => {
-      const { $id, color, placedBy, $updatedAt } = response.payload as { $id: string, color: string, placedBy: string, $updatedAt: string };
-      const [x, y] = $id.split("_").map(Number);
+  private setupSignalR() {
 
-      const pixel = this.pixelArr.find(item => item.x === x && item.y === y);
-      if (pixel) {
-        pixel.color = color;
-        pixel.placedBy = placedBy;
-        pixel.timestamp = new Date($updatedAt);
-      }
-      else {
-        this.pixelArr.push(new Pixel(x, y, color, placedBy, new Date($updatedAt)));
-      }
-      this.drawPixel(x, y, color);
-      this.updateLeaderboard();
-      if (this.isSliderVisible) {
-        this.updateSlider();
-      }
+    this.signalRService.startConnection().subscribe(() => {
+      this.signalRService.receiveMessage().subscribe((message) => {
+        const receivedPixel = JSON.parse(message);
+        if (receivedPixel.placedBy == "") {
+          receivedPixel.placedBy = "Anonymous";
+        }
+
+        this.pixelArr.push(receivedPixel);
+
+        if (this.sliderValue + 1 == this.pixelArr.length) {
+          this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
+          if (this.isSliderVisible) {
+            this.setSliderToMax();
+          }
+        }
+        else {
+          this.sliderOptions = {
+            ...this.sliderOptions,
+            ceil: this.pixelArr.length
+          };
+        }
+
+        this.updateLeaderboard();
+      });
     });
   }
 
@@ -249,10 +256,10 @@ export class AppComponent implements OnInit {
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
 
-    let pixel = this.pixelArr.find(item => item.x === x && item.y === y);
+    let pixel = this.findLatestPixel(x, y);
     if (!pixel) {
       if (x < this.dimensions.width && y < this.dimensions.height) {
-        pixel = new Pixel(x, y, this.defaultColor, "", new Date(0));
+        pixel = new Pixel(x, y, this.defaultColor, "", "");
       }
       else {
         return;
@@ -335,6 +342,14 @@ export class AppComponent implements OnInit {
   }
 
   private handleCanvasClick(e: MouseEvent) {
+    if (this.sliderValue != this.sliderOptions.ceil) {
+      //Exit history mode
+      this.setSliderToMax();
+      this.drawBoard();
+      return;
+    }
+
+
     const rect = this.canvas.getBoundingClientRect();
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
@@ -342,7 +357,6 @@ export class AppComponent implements OnInit {
 
     if (pixel) {
       this.hoverPixel = pixel;
-      this.leaveHistoryMode();
       this.drawPixel(pixel.x, pixel.y, pixel.color);
       this.sendPixel(pixel.x, pixel.y, pixel.color, e);
       this.increaseCounter();
@@ -351,7 +365,7 @@ export class AppComponent implements OnInit {
 
   leaveHistoryMode() {
     if (this.sliderValue != this.pixelArr.length) {
-      this.sliderValue = this.pixelArr.length;
+      this.setSliderToMax()
       this.drawBoard();
     }
   }
@@ -379,15 +393,11 @@ export class AppComponent implements OnInit {
 
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
-    const pixel = this.pixelArr.find(item => item.x === x && item.y === y);
+    const pixel = this.findLatestPixel(x, y);
 
     this.drawHoverPixel(x, y, pixel?.color, false);
 
     if (pixel) {
-      if (!this.isHoverPixelExisting()) {
-        return;
-      }
-
       const options: Intl.DateTimeFormatOptions = {
         year: '2-digit',
         month: '2-digit',
@@ -395,12 +405,22 @@ export class AppComponent implements OnInit {
         hour: '2-digit',
         minute: '2-digit',
       };
-      const text = `(${pixel.x}, ${pixel.y}) ${pixel.placedBy || "Anonymous"}<br/>${pixel.timestamp.toLocaleDateString(undefined, options)}`;
+      const text = `(${pixel.x}, ${pixel.y}) ${pixel.placedBy || "Anonymous"}<br/>${new Date(pixel.timestamp).toLocaleDateString(undefined, options)}`;
       this.showBubble(text, e.clientX, e.clientY);
     }
     else {
       this.hideBubble(true);
     }
+  }
+
+  findLatestPixel(x: number, y: number) {
+    for (let i = this.sliderValue - 1; i >= 0; i--) {
+      const item = this.pixelArr[i];
+      if (item.x === x && item.y === y) {
+        return item;
+      }
+    }
+    return null;
   }
 
 
@@ -427,25 +447,10 @@ export class AppComponent implements OnInit {
 
   onLeave() {
     if (this.hoverPixel) {
-      if (!this.isHoverPixelExisting()) {
-        this.hoverPixel.color = this.defaultColor;
-      }
-
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
       this.hoverPixel = new HoverPixel(-1, -1, "")
     }
     this.hideBubble(false);
-  }
-
-  isHoverPixelExisting(): boolean {
-    //Needed for history due to hoverpixels.
-    if (this.isSliderVisible && this.sliderValue != this.pixelArr.length) {
-      const i = this.pixelArr.findIndex(item => item.x === this.hoverPixel.x && item.y === this.hoverPixel.y);
-      if (this.sliderValue <= i) {
-        return false;
-      }
-    }
-    return true;
   }
 
   drawHoverPixel(x: number, y: number, color: any, force: boolean) {
@@ -454,9 +459,6 @@ export class AppComponent implements OnInit {
     }
     else if (this.hoverPixel.x !== x || this.hoverPixel.y !== y || force) {
 
-      if (!this.isHoverPixelExisting()) {
-        this.hoverPixel.color = this.defaultColor;
-      }
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
 
       this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor);
@@ -469,13 +471,13 @@ export class AppComponent implements OnInit {
     const div = document.getElementById("bubble")!;
     const rect = this.canvas.getBoundingClientRect();
 
-    let yOffset = div.clientHeight;
+    let yOffset = div.clientHeight * 1.3;
     if (clientY - rect.top < yOffset) {
-      yOffset = 0
+      yOffset = -20
     }
-    let xOffset = div.clientWidth;
+    let xOffset = div.clientWidth * 1.15;
     if (clientX - rect.left < rect.width - xOffset) {
-      xOffset = 0
+      xOffset = -30
     }
 
     div.style.visibility = "visible";
@@ -492,42 +494,27 @@ export class AppComponent implements OnInit {
   }
 
   async initializeBoard() {
-
-    const limit = 1000;
+    const limit = 10000;
     let offset = 0;
+    let pixels;
 
-    let result;
     do {
-
-      result = await this.databases.listDocuments(
-        environment.databaseId,
-        environment.collectionId,
-        [Query.limit(limit),
-        Query.offset(offset),
-        Query.orderAsc("$updatedAt"),
-        ]
-      );
-
-
-      result.documents.forEach(document => {
-        const [x, y] = document.$id.split("_").map(Number);
-        const { color, placedBy, $updatedAt } = document;
-        const pixel = this.getValidPixelOrNull(x, y, color, placedBy, new Date($updatedAt));
-
-        if (pixel) {
-          this.pixelArr.push(pixel);
+      const result = await fetch(environment.endpointUrl + `/Canvas/GetRange?offset=${offset}&limit=${limit}`);
+      pixels = await result.json();
+      pixels.forEach((p: Pixel) => {
+        if (p.placedBy == "") {
+          p.placedBy = "Anonymous";
         }
+        this.pixelArr.push(p);
       });
 
       this.drawBoard();
       this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, true)
       this.updateLeaderboard();
+
       offset += limit;
     }
-    while (result.documents.length > 0);
-
-    this.updateLeaderboard();
-
+    while (pixels.length == limit);
 
     try {
       const board = localStorage.getItem("board");
@@ -542,12 +529,11 @@ export class AppComponent implements OnInit {
   }
 
 
-  updateSlider() {
+  setSliderToMax() {
+
     this.sliderOptions = {
-      ceil: this.pixelArr.length,
-      vertical: true,
-      showSelectionBar: true,
-      rightToLeft: true
+      ...this.sliderOptions,
+      ceil: this.pixelArr.length
     };
     this.sliderValue = this.sliderOptions.ceil;
   }
@@ -588,6 +574,14 @@ export class AppComponent implements OnInit {
     this.drawBoard();
   }
 
+  onSliderStart(): void {
+    this.sliderDragState = true;
+  }
+
+  onSliderEnd(): void {
+    this.sliderDragState = false
+  }
+
   getValidPixelOrNull(x: number, y: number, c: any, placedBy: any, updatedAt: any) {
     if (x < 0 || x >= this.dimensions.width || y < 0 || y >= this.dimensions.height) {
       return null;
@@ -601,31 +595,41 @@ export class AppComponent implements OnInit {
     return new Pixel(x, y, c, placedBy, updatedAt);
   }
 
-  sendPixel(xCoord: number, yCoord: number, color: string, e: MouseEvent) {
-    const pixel = this.pixelArr.find(item => item.x === xCoord && item.y === yCoord);
+  async sendPixel(x: number, y: number, color: string, e: MouseEvent) {
+    let pixel = this.findLatestPixel(x, y);
 
+    //Abort task if same pixel by same user already exits.
     if (pixel && pixel.color === color && pixel.placedBy === this.username) {
       return;
     }
 
+    pixel = new Pixel(x, y, color, this.username!, "")
+
     this.playSound();
 
-    const documentId = `${xCoord}_${yCoord}`;
-    const data = { color, placedBy: this.username };
-    const operation = pixel
-      ? this.databases.updateDocument(environment.databaseId, environment.collectionId, documentId, data)
-      : this.databases.createDocument(environment.databaseId, environment.collectionId, documentId, data);
+    const response = await fetch(environment.endpointUrl + "/Canvas/SendPixel", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(pixel)
+    });
 
-    operation.then(() => {
-      console.log("Success.");
-    }).catch(response => {
-      if (response.message.includes("Rate limit")) {
+    if (response.ok) {
+      console.log('Success.');
+    }
+    else if (response.status === 400) {
+      const errorData = await response.text();
+      if (errorData.includes("Rate limit")) {
         const now = new Date();
         this.showBubble(`Wait ${60 - now.getSeconds()} seconds.`, e.clientX, e.clientY);
       }
       this.drawBoard();
-      console.log(response);
-    });
+      console.log(errorData);
+    }
+    else {
+      console.error('HTTP Error:', response.status);
+    }
   }
 
 
@@ -699,20 +703,17 @@ export class AppComponent implements OnInit {
     this.drawBoard();
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
-    this.drawHoverPixel(x, y, this.pixelArr.find(p => p.x === x && p.y === y)?.color, false);
+    this.drawHoverPixel(x, y, this.findLatestPixel(x, y)?.color, false);
   }
 
   private updateZoomLevel(deltaY: number): void {
-    const minZoom = 1;
-    const maxZoom = 10;
-
     if (deltaY < 0) {
-      if (this.zoomLevel < maxZoom) {
-        this.zoomLevel++;
+      if (this.zoomLevel < this.maxZoom) {
+        this.zoomLevel = Math.ceil(this.zoomLevel * 1.5);
       }
     }
-    else if (this.zoomLevel > minZoom) {
-      this.zoomLevel--;
+    else if (this.zoomLevel > this.minZoom) {
+      this.zoomLevel = Math.floor(this.zoomLevel / 1.5);
     }
   }
 

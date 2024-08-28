@@ -9,7 +9,7 @@
       <div style="display: flex">
         <canvas style="flex: 1" class="canvas" id="canvas"></canvas>
         <div style="flex: 1;">
-          <ngx-slider style="margin-left: 3vw" *ngIf="isSliderVisible" id="slider" [(value)]="sliderValue" [options]="sliderOptions" (userChange)="onSliderChange()"></ngx-slider>
+          <ngx-slider style="margin-left: 3vw" *ngIf="isSliderVisible" id="slider" [(value)]="sliderValue" [options]="sliderOptions" (userChange)="onSliderChange()" (userChangeStart)="onSliderStart()" (userChangeEnd)="onSliderEnd()"></ngx-slider>
         </div>
       </div>
       <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>

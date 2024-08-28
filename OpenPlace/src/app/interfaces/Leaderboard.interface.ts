@@ -1,4 +1,4 @@
 export interface Leaderboard {
-  name: string;
+  name: string | null;
   placedPixels: number;
 }
