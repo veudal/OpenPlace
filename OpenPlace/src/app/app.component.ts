@@ -360,7 +360,6 @@ export class AppComponent implements OnInit {
       this.hoverPixel = pixel;
       this.drawPixel(pixel.x, pixel.y, pixel.color);
       this.sendPixel(pixel.x, pixel.y, pixel.color, e);
-      this.increaseCounter();
     }
   }
 
@@ -630,6 +629,7 @@ export class AppComponent implements OnInit {
       if (index > -1) {
         this.pixelQueue.splice(index, 1);
       }
+      this.increaseCounter();
       console.log('Success.');
     }
     else if (response.status === 429) {
