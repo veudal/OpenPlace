@@ -12,9 +12,9 @@ export class SignalRService {
   constructor() {
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(environment.endpointUrl + "/hub", {
-      skipNegotiation: true,
-      transport: signalR.HttpTransportType.WebSockets
-    }).build();
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets
+      }).build();
   }
 
   startConnection(): Observable<void> {

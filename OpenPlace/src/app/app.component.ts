@@ -7,6 +7,7 @@ import { environment } from '../environments/environment';
 import { BoardSize } from './interfaces/BoardSize.interface';
 import { Leaderboard } from './interfaces/Leaderboard.interface';
 import { SignalRService } from './services/signalr.service';
+import { ViewSettings } from './interfaces/ViewSettings.interface';
 
 @Component({
   selector: 'app-root',
@@ -28,7 +29,8 @@ export class AppComponent implements OnInit {
   pickr: Pickr | null = null;
 
   hoverPixel: HoverPixel = new HoverPixel(-1, -1, "");
-  pixelArr: Pixel[] = [];
+  boardArr: Pixel[] = [];
+  pixelQueue: Pixel[] = [];
   dimensions: BoardSize = { width: 256, height: 256 };
   minZoom = 1;
   maxZoom = Math.min(this.dimensions.width, this.dimensions.height) / 10;
@@ -56,19 +58,17 @@ export class AppComponent implements OnInit {
   constructor(private signalRService: SignalRService) { }
 
   async ngOnInit() {
-    this.initialize();
-
-    // Set up event listeners
-    this.setupCanvasEvents();
-    this.initializePaletteContainer();
-    this.initializeColorPicker()
-    this.setupWindowResizeEvent();
-    this.setupSignalR();
-    this.setupDocumentEvents();
+    this.init();
+    this.initCanvasEvents();
+    this.initWindowResizeEvent();
+    this.initSignalR();
+    this.initDocumentEvents();
+    this.initPaletteContainer();
+    this.initColorPicker()
   }
 
 
-  private initializeColorPicker() {
+  private initColorPicker() {
     this.pickr = Pickr.create({
       el: '.color-picker',
       theme: 'monolith',
@@ -125,21 +125,23 @@ export class AppComponent implements OnInit {
     });
   }
 
-  private async initialize() {
+  private async init() {
+
     // Initialize canvas
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext("2d");
     this.canvas.setAttribute('tabindex', '0');
 
-    await this.initializeBoard();
-    this.isSliderVisible = true;
-    this.setSliderToMax();
+    await this.loadBoard();
   }
 
-  private setupCanvasEvents() {
+  private initCanvasEvents() {
     this.resizeCanvas();
+    this.canvas.addEventListener('keydown', (e: KeyboardEvent) => this.handleMovement(e));
     this.canvas.addEventListener("contextmenu", (e: Event) => e.preventDefault());
     this.canvas.addEventListener('wheel', this.zoom.bind(this));
+    this.canvas.addEventListener('click', (e: MouseEvent) => this.handleCanvasClick(e));
+    this.canvas.addEventListener('mousedown', (e: MouseEvent) => this.getColor(e));
     this.canvas.addEventListener("mousemove", this.onHover.bind(this));
     this.canvas.addEventListener("mouseleave", this.onLeave.bind(this));
     this.canvas.addEventListener('mouseover', (e: MouseEvent) => {
@@ -149,7 +151,7 @@ export class AppComponent implements OnInit {
     });
   }
 
-  private initializePaletteContainer() {
+  private initPaletteContainer() {
     const storedColor = localStorage.getItem("customColor");
     if (storedColor !== null) {
       this.colorPalette[0] = storedColor;
@@ -197,7 +199,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  private setupWindowResizeEvent() {
+  private initWindowResizeEvent() {
     window.addEventListener('resize', () => {
       this.zoomLevel = 1;
       this.resizeCanvas();
@@ -205,7 +207,7 @@ export class AppComponent implements OnInit {
     });
   }
 
-  private setupSignalR() {
+  private initSignalR() {
 
     this.signalRService.startConnection().subscribe(() => {
       this.signalRService.receiveMessage().subscribe((message) => {
@@ -214,9 +216,9 @@ export class AppComponent implements OnInit {
           receivedPixel.placedBy = "Anonymous";
         }
 
-        this.pixelArr.push(receivedPixel);
+        this.boardArr.push(receivedPixel);
 
-        if (this.sliderValue + 1 == this.pixelArr.length) {
+        if (this.sliderValue + 1 == this.boardArr.length) {
           this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
           if (this.isSliderVisible) {
             this.setSliderToMax();
@@ -225,7 +227,7 @@ export class AppComponent implements OnInit {
         else {
           this.sliderOptions = {
             ...this.sliderOptions,
-            ceil: this.pixelArr.length
+            ceil: this.boardArr.length
           };
         }
 
@@ -234,12 +236,9 @@ export class AppComponent implements OnInit {
     });
   }
 
-  private setupDocumentEvents() {
+  private initDocumentEvents() {
     document.addEventListener('wheel', (e: WheelEvent) => e.preventDefault(), { passive: false });
     document.addEventListener('keydown', (e: KeyboardEvent) => this.handleColorSelection(e));
-    this.canvas.addEventListener('keydown', (e: KeyboardEvent) => this.handleMovement(e));
-    this.canvas.addEventListener('click', (e: MouseEvent) => this.handleCanvasClick(e));
-    this.canvas.addEventListener('mousedown', (e: MouseEvent) => this.getColor(e));
 
     document.addEventListener('selectionchange', () => {
       if (document.activeElement?.id == "canvas") {
@@ -346,6 +345,8 @@ export class AppComponent implements OnInit {
       //Exit history mode
       this.setSliderToMax();
       this.drawBoard();
+
+      this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || this.hoverPixel;
       return;
     }
 
@@ -363,14 +364,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  leaveHistoryMode() {
-    if (this.sliderValue != this.pixelArr.length) {
-      this.setSliderToMax()
-      this.drawBoard();
-    }
-  }
-
-  increaseCounter() {
+  private increaseCounter() {
     const storedVal = localStorage.getItem("placedPixels");
     let count = 1;
     if (storedVal) {
@@ -380,7 +374,7 @@ export class AppComponent implements OnInit {
   }
 
 
-  async playSound() {
+  private async playSound() {
     if (!this.audio.paused) {
       this.audio.pause();
       this.audio.currentTime = 0;
@@ -390,7 +384,6 @@ export class AppComponent implements OnInit {
 
   onHover(e: MouseEvent) {
     const rect = this.canvas.getBoundingClientRect();
-
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
     const pixel = this.findLatestPixel(x, y);
@@ -413,9 +406,13 @@ export class AppComponent implements OnInit {
     }
   }
 
-  findLatestPixel(x: number, y: number) {
-    for (let i = this.sliderValue - 1; i >= 0; i--) {
-      const item = this.pixelArr[i];
+  private findLatestPixel(x: number, y: number) {
+    let max = this.boardArr.length;
+    if (this.isSliderVisible) {
+      max = this.sliderValue;
+    }
+    for (let i = max - 1; i >= 0; i--) {
+      const item = this.boardArr[i];
       if (item.x === x && item.y === y) {
         return item;
       }
@@ -424,15 +421,15 @@ export class AppComponent implements OnInit {
   }
 
 
-  calculateXPosition(mouse: number, rect: any) {
+  private calculateXPosition(mouse: number, rect: any) {
     return Math.floor((mouse - rect.left) / rect.width * this.dimensions.width / this.zoomLevel + (1 - 1 / this.zoomLevel) * this.originX);
   }
 
-  calculateYPosition(mouse: number, rect: any) {
+  private calculateYPosition(mouse: number, rect: any) {
     return Math.floor((mouse - rect.top) / rect.height * this.dimensions.height / this.zoomLevel + (1 - 1 / this.zoomLevel) * this.originY);
   }
 
-  hideBubble(checkForMessage: boolean) {
+  private hideBubble(checkForMessage: boolean) {
     const bubble = document.getElementById("bubble");
 
     if (checkForMessage && bubble?.innerText.startsWith("Wait")) {
@@ -445,7 +442,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  onLeave() {
+  private onLeave() {
     if (this.hoverPixel) {
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
       this.hoverPixel = new HoverPixel(-1, -1, "")
@@ -453,7 +450,7 @@ export class AppComponent implements OnInit {
     this.hideBubble(false);
   }
 
-  drawHoverPixel(x: number, y: number, color: any, force: boolean) {
+  private drawHoverPixel(x: number, y: number, color: any, force: boolean) {
     if (!this.hoverPixel) {
       this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor);
     }
@@ -467,9 +464,10 @@ export class AppComponent implements OnInit {
   }
 
 
-  showBubble(text: string, clientX: number, clientY: number) {
+  private showBubble(text: string, clientX: number, clientY: number) {
     const div = document.getElementById("bubble")!;
     const rect = this.canvas.getBoundingClientRect();
+    div.innerHTML = text;
 
     let yOffset = div.clientHeight * 1.3;
     if (clientY - rect.top < yOffset) {
@@ -484,7 +482,6 @@ export class AppComponent implements OnInit {
     div.style.opacity = "1";
     div.style.left = `${clientX - xOffset}px`;
     div.style.top = `${clientY - yOffset}px`;
-    div.innerHTML = text;
 
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
@@ -493,19 +490,26 @@ export class AppComponent implements OnInit {
 
   }
 
-  async initializeBoard() {
+  private async loadBoard() {
+
     const limit = 10000;
     let offset = 0;
     let pixels;
 
     do {
-      const result = await fetch(environment.endpointUrl + `/Canvas/GetRange?offset=${offset}&limit=${limit}`);
+
+      const result = await fetch(environment.endpointUrl + `/GetRange?offset=${offset}&limit=${limit}`);
+      if (!pixels) {
+        this.restoreViewSettings();
+      }
+
       pixels = await result.json();
+
       pixels.forEach((p: Pixel) => {
         if (p.placedBy == "") {
           p.placedBy = "Anonymous";
         }
-        this.pixelArr.push(p);
+        this.boardArr.push(p);
       });
 
       this.drawBoard();
@@ -516,12 +520,15 @@ export class AppComponent implements OnInit {
     }
     while (pixels.length == limit);
 
+    this.isSliderVisible = true;
+    this.setSliderToMax();
+
     try {
       const board = localStorage.getItem("board");
-      if (board && JSON.parse(board).length >= this.pixelArr.length) {
+      if (board && JSON.parse(board).length >= this.boardArr.length) {
         return;
       }
-      localStorage.setItem("board", JSON.stringify(this.pixelArr));
+      localStorage.setItem("board", JSON.stringify(this.boardArr));
     }
     catch {
       console.log("Could not save board array.")
@@ -529,18 +536,18 @@ export class AppComponent implements OnInit {
   }
 
 
-  setSliderToMax() {
+  private setSliderToMax() {
 
     this.sliderOptions = {
       ...this.sliderOptions,
-      ceil: this.pixelArr.length
+      ceil: this.boardArr.length
     };
     this.sliderValue = this.sliderOptions.ceil;
   }
 
-  updateLeaderboard() {
+  private updateLeaderboard() {
     const leaderboard: Leaderboard[] = [];
-    for (const pixel of this.pixelArr) {
+    for (const pixel of this.boardArr) {
 
       const existingEntry = leaderboard.find(item => item.name === pixel.placedBy);
       if (existingEntry) {
@@ -570,19 +577,19 @@ export class AppComponent implements OnInit {
 
   }
 
-  onSliderChange(): void {
+  public onSliderChange(): void {
     this.drawBoard();
   }
 
-  onSliderStart(): void {
+  public onSliderStart(): void {
     this.sliderDragState = true;
   }
 
-  onSliderEnd(): void {
+  public onSliderEnd(): void {
     this.sliderDragState = false
   }
 
-  getValidPixelOrNull(x: number, y: number, c: any, placedBy: any, updatedAt: any) {
+  private getValidPixelOrNull(x: number, y: number, c: any, placedBy: any, updatedAt: any) {
     if (x < 0 || x >= this.dimensions.width || y < 0 || y >= this.dimensions.height) {
       return null;
     }
@@ -595,7 +602,7 @@ export class AppComponent implements OnInit {
     return new Pixel(x, y, c, placedBy, updatedAt);
   }
 
-  async sendPixel(x: number, y: number, color: string, e: MouseEvent) {
+  private async sendPixel(x: number, y: number, color: string, e: MouseEvent) {
     let pixel = this.findLatestPixel(x, y);
 
     //Abort task if same pixel by same user already exits.
@@ -604,26 +611,33 @@ export class AppComponent implements OnInit {
     }
 
     pixel = new Pixel(x, y, color, this.username!, "")
-
+    if (this.pixelQueue.includes(pixel)) {
+      return;
+    }
+    this.pixelQueue.push(pixel)
     this.playSound();
 
-    const response = await fetch(environment.endpointUrl + "/Canvas/SendPixel", {
+    const response = await fetch(environment.endpointUrl + "/SendPixel", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(pixel)
-    });
+    })
 
     if (response.ok) {
+      const index = this.pixelQueue.indexOf(pixel);
+      if (index > -1) {
+        this.pixelQueue.splice(index, 1);
+      }
       console.log('Success.');
+    }
+    else if (response.status === 429) {
+      this.showBubble(`Wait ${response.headers.get("retry-after")} seconds.`, e.clientX, e.clientY);
+      this.drawBoard();
     }
     else if (response.status === 400) {
       const errorData = await response.text();
-      if (errorData.includes("Rate limit")) {
-        const now = new Date();
-        this.showBubble(`Wait ${60 - now.getSeconds()} seconds.`, e.clientX, e.clientY);
-      }
       this.drawBoard();
       console.log(errorData);
     }
@@ -633,22 +647,21 @@ export class AppComponent implements OnInit {
   }
 
 
-  drawBoard() {
-    let count = this.pixelArr.length;
-
+  private drawBoard() {
+    let max = this.boardArr.length;
     if (this.isSliderVisible) {
-      count = this.sliderValue;
+      max = this.sliderValue;
     }
 
     this.ctx.clearRect(0, 0, this.dimensions.width, this.dimensions.height)
 
-    for (let i = 0; i < count; i++) {
-      const p = this.pixelArr[i];
+    for (let i = 0; i < max; i++) {
+      const p = this.boardArr[i];
       this.drawPixel(p.x, p.y, p.color);
     }
   }
 
-  drawPixel(x: number, y: number, c: string) {
+  private drawPixel(x: number, y: number, c: string) {
 
     if (this.getValidPixelOrNull(x, y, c, null, null) == null) {
       return;
@@ -658,7 +671,7 @@ export class AppComponent implements OnInit {
     this.ctx.fillRect(x, y, 1, 1);
   }
 
-  resizeCanvas() {
+  private resizeCanvas() {
 
 
     this.canvas.width = this.dimensions.width;
@@ -674,7 +687,7 @@ export class AppComponent implements OnInit {
 
   }
 
-  usernameChange(event: Event) {
+  public usernameChange(event: Event) {
     const val = (event.target as HTMLInputElement).value
     if (val.length > 16) {
       (event.target as HTMLInputElement).value = this.username || "";
@@ -685,7 +698,7 @@ export class AppComponent implements OnInit {
     localStorage.setItem("username", val);
   }
 
-  zoom(e: WheelEvent) {
+  private zoom(e: WheelEvent) {
     this.updateZoomLevel(e.deltaY);
     this.resizeCanvas();
 
@@ -731,5 +744,29 @@ export class AppComponent implements OnInit {
     this.ctx.translate(this.originX, this.originY);
     this.ctx.scale(this.zoomLevel, this.zoomLevel);
     this.ctx.translate(-this.originX, -this.originY);
+
+    this.saveViewSettings();
+  }
+
+  private saveViewSettings() {
+    const settings: ViewSettings = {
+      originX: this.originX,
+      originY: this.originY,
+      zoom: this.zoomLevel
+    };
+    localStorage.setItem('canvasViewSettings', JSON.stringify(settings));
+  }
+
+  private restoreViewSettings() {
+    const stored = localStorage.getItem('canvasViewSettings');
+    if (!stored) {
+      return;
+    }
+    const settings: ViewSettings = JSON.parse(stored);
+    this.originX = settings.originX;
+    this.originY = settings.originY;
+    this.zoomLevel = settings.zoom;
+    this.resizeCanvas();
+    this.applyTransformations();
   }
 }
