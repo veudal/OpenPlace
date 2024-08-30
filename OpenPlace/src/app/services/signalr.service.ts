@@ -14,7 +14,7 @@ export class SignalRService {
       .withUrl(environment.endpointUrl + "/hub", {
         skipNegotiation: true,
         transport: signalR.HttpTransportType.WebSockets
-      }).build();
+      }).withAutomaticReconnect().build();
   }
 
   startConnection(): Observable<void> {
@@ -31,6 +31,10 @@ export class SignalRService {
           observer.error(error);
         });
     });
+  }
+
+  getState() {
+    return this.hubConnection.state;
   }
 
   receiveMessage(): Observable<string> {

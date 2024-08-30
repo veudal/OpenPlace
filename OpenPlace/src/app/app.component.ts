@@ -1,5 +1,4 @@
 import { Component, OnInit, isDevMode } from '@angular/core';
-import { Client, Databases, Query } from 'appwrite';
 import { Pixel } from './models/Pixel.model';
 import { HoverPixel } from './models/HoverPixel';
 import Pickr from '@simonwep/pickr';
@@ -8,6 +7,7 @@ import { BoardSize } from './interfaces/BoardSize.interface';
 import { Leaderboard } from './interfaces/Leaderboard.interface';
 import { SignalRService } from './services/signalr.service';
 import { ViewSettings } from './interfaces/ViewSettings.interface';
+import { HubConnection, HubConnectionState } from '@microsoft/signalr';
 
 @Component({
   selector: 'app-root',
@@ -48,9 +48,6 @@ export class AppComponent implements OnInit {
     showSelectionBar: true,
     rightToLeft: true
   };
-
-  client: Client = new Client();
-  databases: Databases = new Databases(this.client);
 
   canvas: any;
   ctx: any;
@@ -211,29 +208,33 @@ export class AppComponent implements OnInit {
 
     this.signalRService.startConnection().subscribe(() => {
       this.signalRService.receiveMessage().subscribe((message) => {
-        const receivedPixel = JSON.parse(message);
-        if (receivedPixel.placedBy == "") {
-          receivedPixel.placedBy = "Anonymous";
-        }
-
-        this.boardArr.push(receivedPixel);
-
-        if (this.sliderValue + 1 == this.boardArr.length) {
-          this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
-          if (this.isSliderVisible) {
-            this.setSliderToMax();
-          }
-        }
-        else {
-          this.sliderOptions = {
-            ...this.sliderOptions,
-            ceil: this.boardArr.length
-          };
-        }
-
-        this.updateLeaderboard();
+        this.receivePixel(message);
       });
     });
+  }
+
+  private receivePixel(message: string) {
+    const receivedPixel = JSON.parse(message);
+    if (receivedPixel.placedBy == "") {
+      receivedPixel.placedBy = "Anonymous";
+    }
+
+    this.boardArr.push(receivedPixel);
+
+    if (this.sliderValue + 1 == this.boardArr.length) {
+      this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
+      if (this.isSliderVisible) {
+        this.setSliderToMax();
+      }
+    }
+    else {
+      this.sliderOptions = {
+        ...this.sliderOptions,
+        ceil: this.boardArr.length
+      };
+    }
+
+    this.updateLeaderboard();
   }
 
   private initDocumentEvents() {
@@ -577,7 +578,9 @@ export class AppComponent implements OnInit {
   }
 
   public onSliderChange(): void {
-    this.drawBoard();
+    setTimeout(() => {
+      this.drawBoard()
+    }, 20);
   }
 
   public onSliderStart(): void {
@@ -602,47 +605,49 @@ export class AppComponent implements OnInit {
   }
 
   private async sendPixel(x: number, y: number, color: string, e: MouseEvent) {
-    let pixel = this.findLatestPixel(x, y);
+    const originalPixel = this.findLatestPixel(x, y);
 
     //Abort task if same pixel by same user already exits.
-    if (pixel && pixel.color === color && pixel.placedBy === this.username) {
+    if (originalPixel && originalPixel.color === color && originalPixel.placedBy === this.username) {
       return;
     }
 
-    pixel = new Pixel(x, y, color, this.username!, "")
-    if (this.pixelQueue.includes(pixel)) {
+    const newPixel = new Pixel(x, y, color, this.username!, "")
+    if (this.pixelQueue.includes(newPixel)) {
       return;
     }
-    this.pixelQueue.push(pixel)
+    this.pixelQueue.push(newPixel)
     this.playSound();
+    if (this.signalRService.getState() == HubConnectionState.Disconnecting || this.signalRService.getState() == HubConnectionState.Disconnected) {
+      this.initSignalR();
+    }
+    try {
 
-    const response = await fetch(environment.endpointUrl + "/SendPixel", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(pixel)
-    })
+      const response = await fetch(environment.endpointUrl + "/SendPixel", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newPixel)
+      })
 
-    if (response.ok) {
-      const index = this.pixelQueue.indexOf(pixel);
-      if (index > -1) {
-        this.pixelQueue.splice(index, 1);
+      if (response.ok) {
+        const index = this.pixelQueue.indexOf(newPixel);
+        if (index > -1) {
+          this.pixelQueue.splice(index, 1);
+        }
+        this.increaseCounter();
+        console.log('Success.');
       }
-      this.increaseCounter();
-      console.log('Success.');
+      else if (response.status === 429) {
+        this.showBubble(`Wait ${response.headers.get("retry-after")} seconds.`, e.clientX, e.clientY);
+        this.drawBoard();
+      }
     }
-    else if (response.status === 429) {
-      this.showBubble(`Wait ${response.headers.get("retry-after")} seconds.`, e.clientX, e.clientY);
-      this.drawBoard();
-    }
-    else if (response.status === 400) {
-      const errorData = await response.text();
-      this.drawBoard();
-      console.log(errorData);
-    }
-    else {
-      console.error('HTTP Error:', response.status);
+    catch (e) {
+      this.hoverPixel = originalPixel!;
+      this.drawBoard()
+      console.log(e);
     }
   }
 
@@ -652,12 +657,13 @@ export class AppComponent implements OnInit {
     if (this.isSliderVisible) {
       max = this.sliderValue;
     }
-
     this.ctx.clearRect(0, 0, this.dimensions.width, this.dimensions.height)
+
 
     for (let i = 0; i < max; i++) {
       const p = this.boardArr[i];
       this.drawPixel(p.x, p.y, p.color);
+
     }
   }
 
