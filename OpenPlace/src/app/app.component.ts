@@ -1,13 +1,13 @@
 import { Component, OnInit, isDevMode } from '@angular/core';
+import Pickr from '@simonwep/pickr';
 import { Pixel } from './models/Pixel.model';
 import { HoverPixel } from './models/HoverPixel';
-import Pickr from '@simonwep/pickr';
 import { environment } from '../environments/environment';
 import { BoardSize } from './interfaces/BoardSize.interface';
 import { Leaderboard } from './interfaces/Leaderboard.interface';
 import { SignalRService } from './services/signalr.service';
 import { ViewSettings } from './interfaces/ViewSettings.interface';
-import { HubConnection, HubConnectionState } from '@microsoft/signalr';
+import { HubConnectionState } from '@microsoft/signalr';
 
 @Component({
   selector: 'app-root',
