@@ -8,9 +8,6 @@ body, html {
   background-color: #111827 !important;
 }
 
-html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
-
 
 .leaderboard-item {
   display: flex;
@@ -42,7 +39,7 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
     white-space: nowrap;
     max-width: 150px;
   }
-  
+
   .leaderboard-item .score {
     text-align: right;
     color: #4CAF50;

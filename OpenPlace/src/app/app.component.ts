@@ -21,7 +21,7 @@ export class AppComponent implements OnInit {
   colorPalette: string[] = ["000000", "000000", "FFFFFF", "0000FF", "00FFFF", "FF0000", "00FF00", "FFFF00", "FF00FF", "7c4dff"];
   defaultColor: string = "FFFFFF";
   username: string | null = localStorage.getItem("username");
-
+  defaultUsername: string = "Anonymous";
   timeoutId: number | null = null;
   zoomLevel: number = 1;
 
@@ -216,7 +216,7 @@ export class AppComponent implements OnInit {
   private receivePixel(message: string) {
     const receivedPixel = JSON.parse(message);
     if (receivedPixel.placedBy == "") {
-      receivedPixel.placedBy = "Anonymous";
+      receivedPixel.placedBy = this.defaultUsername;
     }
 
     this.boardArr.push(receivedPixel);
@@ -398,7 +398,7 @@ export class AppComponent implements OnInit {
         hour: '2-digit',
         minute: '2-digit',
       };
-      const text = `(${pixel.x}, ${pixel.y}) ${pixel.placedBy || "Anonymous"}<br/>${new Date(pixel.timestamp).toLocaleDateString(undefined, options)}`;
+      const text = `(${pixel.x}, ${pixel.y}) ${pixel.placedBy || this.defaultUsername}<br/>${new Date(pixel.timestamp).toLocaleDateString(undefined, options)}`;
       this.showBubble(text, e.clientX, e.clientY);
     }
     else {
@@ -507,11 +507,10 @@ export class AppComponent implements OnInit {
 
       pixels.forEach((p: Pixel) => {
         if (p.placedBy == "") {
-          p.placedBy = "Anonymous";
+          p.placedBy = this.defaultUsername;
         }
         this.boardArr.push(p);
       });
-
       this.drawBoard();
       this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, true)
       this.updateLeaderboard();
@@ -579,7 +578,10 @@ export class AppComponent implements OnInit {
 
   public onSliderChange(): void {
     setTimeout(() => {
-      this.drawBoard()
+      this.drawBoard();
+
+      //Add this in future?
+      //this.updateLeaderboard()
     }, 20);
   }
 
@@ -608,12 +610,13 @@ export class AppComponent implements OnInit {
     const originalPixel = this.findLatestPixel(x, y);
 
     //Abort task if same pixel by same user already exits.
-    if (originalPixel && originalPixel.color === color && originalPixel.placedBy === this.username) {
+    if (originalPixel && originalPixel.color === color && originalPixel.placedBy === (this.username || this.defaultUsername)) {
       return;
     }
 
-    const newPixel = new Pixel(x, y, color, this.username!, "")
-    if (this.pixelQueue.includes(newPixel)) {
+    const newPixel = new Pixel(x, y, color, this.username || this.defaultUsername, "")
+    if (this.getIndex(newPixel) != -1) {
+      console.log("BLOCKED")
       return;
     }
     this.pixelQueue.push(newPixel)
@@ -632,10 +635,7 @@ export class AppComponent implements OnInit {
       })
 
       if (response.ok) {
-        const index = this.pixelQueue.indexOf(newPixel);
-        if (index > -1) {
-          this.pixelQueue.splice(index, 1);
-        }
+        this.pixelQueue.splice(this.getIndex(newPixel), 1);
         this.increaseCounter();
         console.log('Success.');
       }
@@ -775,4 +775,9 @@ export class AppComponent implements OnInit {
     this.resizeCanvas();
     this.applyTransformations();
   }
+
+  private getIndex(p: Pixel): number {
+    return this.pixelQueue.findIndex(item => item.x == p.x && item.y == p.y && item.color == p.color && item.placedBy == p.placedBy);
+  }
 }
+
