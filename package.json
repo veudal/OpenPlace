@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@angular-slider/ngx-slider": "^18.0.0",
     "@microsoft/signalr": "^8.0.7"
   }
 }
