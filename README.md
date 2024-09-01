@@ -1,6 +1,8 @@
 # OpenPlace
 
-A reddit r/place clone (online pixel art plattform in which everyone shares one board) implemented in Angular
+A reddit r/place clone (online pixel art plattform where all users share a canvas) implemented in Angular. All data is stored in a SQL Database on Microsoft Azure.
+
+DISCLAIMER: User-generated content may not be monitored and you may encounter inappropriate material.
 
 # How to use (tricks & extra infos)
 
@@ -30,6 +32,7 @@ Before creating anything, please read our [canvas guidelines](https://github.com
 - Usernames
 - Zoom
 - Moving
+- Automatic zoom and position recovery on opening
 - Hover/preview pixel on mouse over
 - Info bubbles for each pixel (timestamp, username and x|y coordinates)
 - 9 preset colors and one custom color
