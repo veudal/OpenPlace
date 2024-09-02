@@ -1,0 +1,120 @@
+.canvas {
+  display: block;
+  background-color: white;
+  image-rendering: pixelated;
+  touch-action: manipulation;
+  outline: none;
+}
+
+
+.body {
+  display: flex;
+  justify-content: center;
+  height: 98vh;
+  margin: 0;
+}
+
+@media (min-width: 1400px) {
+  .container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 10vw;
+  }
+
+  .username-input-container {
+    flex-shrink: 0;
+    width: 280px;
+  }
+}
+
+@media (max-width: 1399px) { /* Adjust for mobile or smaller screens */
+  .container {
+    margin-top: 10vh;
+    display: block;
+  }
+
+  .div {
+    margin-bottom: 3vh;
+  }
+}
+
+.palette-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(35px, 1fr));
+  background-color: #223a70;
+  border-radius: 20px;
+  padding: 12px 3vw;
+  margin-top: 12px;
+  gap: 10px;
+  justify-content: center;
+}
+
+
+.rounded {
+  border-radius: 0.5rem;
+}
+
+.transition {
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.leaderboard {
+  margin-top: 4vh;
+  margin-bottom: 3vh;
+  width: 100%;
+  max-width: 600px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.leaderboard-header {
+  background-color: #4CAF50;
+  color: #fff;
+  padding: 20px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.leaderboard-list {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.github-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+}
+
+  .github-corner:hover .octo-arm {
+    animation: octocat-wave 560ms ease-in-out;
+  }
+
+@keyframes octocat-wave {
+  0%, 100% {
+    transform: rotate(0);
+  }
+
+  20%, 60% {
+    transform: rotate(-25deg);
+  }
+
+  40%, 80% {
+    transform: rotate(10deg);
+  }
+}
+
+@media (max-width: 500px) {
+  .github-corner:hover .octo-arm {
+    animation: none;
+  }
+
+  .github-corner .octo-arm {
+    animation: octocat-wave 560ms ease-in-out;
+  }
+}

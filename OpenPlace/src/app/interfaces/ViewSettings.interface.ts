@@ -1,5 +1,5 @@
 export interface ViewSettings {
-  originX: number;
-  originY: number;
-  zoom: number;
+  x: number;
+  y: number;
+  scale: number;
 }

@@ -27,22 +27,22 @@
               "base": "../docs",
               "browser": ""
             },
-              "index": "src/index.html",
-              "browser": "src/main.ts",
-              "polyfills": [
-                "zone.js"
-              ],
-              "tsConfig": "tsconfig.app.json",
-              "assets": [
-                "src/favicon.ico",
-                "src/assets"
-              ],
-              "styles": [
-                "@angular/material/prebuilt-themes/indigo-pink.css",
-                "src/styles.css"
-              ],
-              "scripts": []
-            },
+            "index": "src/index.html",
+            "browser": "src/main.ts",
+            "polyfills": [
+              "zone.js"
+            ],
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              "src/favicon.ico",
+              "src/assets"
+            ],
+            "styles": [
+              "@angular/material/prebuilt-themes/indigo-pink.css",
+              "src/styles.css"
+            ],
+            "scripts": []
+          },
           "configurations": {
             "production": {
               "budgets": [

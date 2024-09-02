@@ -14,9 +14,11 @@ import { NgxSliderModule } from '@angular-slider/ngx-slider';
     AppRoutingModule,
     NgxSliderModule
   ],
+
   providers: [
-    provideAnimationsAsync()
+    provideAnimationsAsync(),
   ],
   bootstrap: [AppComponent]
 })
+
 export class AppModule { }
