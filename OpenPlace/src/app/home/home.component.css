@@ -44,7 +44,7 @@
   grid-template-columns: repeat(auto-fit, minmax(35px, 1fr));
   background-color: #223a70;
   border-radius: 20px;
-  padding: 12px 3vw;
+  padding: 12px 10vw;
   margin-top: 12px;
   gap: 10px;
   justify-content: center;

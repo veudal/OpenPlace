@@ -181,7 +181,6 @@ export class HomeComponent implements OnInit {
     this.resizeCanvas();
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
     this.canvas.addEventListener('keydown', (e: KeyboardEvent) => this.handleMovement(e));
-    this.canvas.addEventListener('pointerup', (e: MouseEvent) => this.handleMouseUp(e));
     this.canvas.addEventListener('pointerdown', (e: MouseEvent) => this.handleMouseDown(e));
     this.canvas.addEventListener("pointermove", this.onHover.bind(this));
     this.canvas.addEventListener("pointerleave", this.onLeave.bind(this));
@@ -322,7 +321,25 @@ export class HomeComponent implements OnInit {
 
 
   private handleMouseDown(e: MouseEvent) {
-    this.panzoom.setOptions({ disablePan: e.button != 2 })
+    this.panzoom.setOptions({ disablePan: e.button != 2 });
+
+    if (e.button == 1 || e.button == 2) {
+      const pan = this.panzoom.getPan();
+      const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
+
+      const tolerance = 1; //Adjustment may be needed
+
+      const xMatch = Math.abs(Math.round(pan.x) - stored.x) <= tolerance;
+      const yMatch = Math.abs(Math.round(pan.y) - stored.y) <= tolerance;
+
+
+      if (xMatch && yMatch) {
+        this.getColor(e);
+      }
+    }
+    else if (e.button == 0) {
+      this.setPixel(e);
+    }
   }
 
   private handleKeydown(e: KeyboardEvent) {
@@ -351,9 +368,11 @@ export class HomeComponent implements OnInit {
     }
     else if (e.key == "+") {
       this.panzoom.zoomIn();
+      this.savePanzoomState();
     }
     else if (e.key == "-") {
       this.panzoom.zoomOut();
+      this.savePanzoomState();
     }
     else if (e.key == " ") {
       this.updatePaletteSelection(null, 0);
@@ -469,25 +488,6 @@ export class HomeComponent implements OnInit {
     this.savePanzoomState();
   }
 
-  private handleMouseUp(e: MouseEvent) {
-    if (e.button == 1 || e.button == 2) {
-      const pan = this.panzoom.getPan();
-      const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
-
-      const tolerance = 1; //Adjustment may needed
-
-      const xMatch = Math.abs(Math.round(pan.x) - stored.x) <= tolerance;
-      const yMatch = Math.abs(Math.round(pan.y) - stored.y) <= tolerance;
-
-
-      if (xMatch && yMatch) {
-        this.getColor(e);
-      }
-    }
-    else if (e.button == 0) {
-      this.setPixel(e);
-    }
-  }
 
   private setPixel(e: MouseEvent) {
     if (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null) {
@@ -655,26 +655,34 @@ export class HomeComponent implements OnInit {
     let offset = 0;
     let pixels;
 
-    do {
+    try {
+      do {
 
-      const result = await fetch(environment.endpointUrl + `/GetRange?offset=${offset}&limit=${limit}`);
+        const result = await fetch(environment.endpointUrl + `/GetRange?offset=${offset}&limit=${limit}`);
+        pixels = await result.json();
 
-      pixels = await result.json();
+        pixels.forEach((p: Pixel) => {
+          if (p.placedBy == "") {
+            p.placedBy = this.defaultUsername;
+          }
+          this.boardArr.push(p);
+        });
+        this.drawBoard();
+        this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, this.hoverPixel.placedBy, true)
+        this.updateLeaderboard();
 
-      pixels.forEach((p: Pixel) => {
-        if (p.placedBy == "") {
-          p.placedBy = this.defaultUsername;
-        }
-        this.boardArr.push(p);
-      });
-      this.drawBoard();
-      this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, this.hoverPixel.placedBy, true)
-      this.updateLeaderboard();
-
-      offset += limit;
+        offset += limit;
+      }
+      while (pixels.length == limit);
     }
-    while (pixels.length == limit);
-
+    catch (error: any) {
+      if (error instanceof Error && error.message.toLowerCase().includes('fetch')) {
+        alert("This site is currently under maintenance.");
+      }
+      else {
+        alert("An error occured while loading the canvas: " + error.message);
+      }
+    }
     this.isSliderVisible = true;
     this.setSliderToMax();
 
@@ -751,7 +759,7 @@ export class HomeComponent implements OnInit {
   }
 
   public onSliderEnd(): void {
-    this.sliderDragState = false
+    this.sliderDragState = false;
   }
 
   private getValidPixelOrNull(x: number, y: number, c: any, placedBy: any, updatedAt: any) {
@@ -816,14 +824,11 @@ export class HomeComponent implements OnInit {
 
     const temp = [...this.boardArr];
 
-
-
     let max = this.boardArr.length;
     if (this.isSliderVisible) {
       max = this.sliderValue;
     }
     this.context.clearRect(0, 0, this.dimensions.width, this.dimensions.height)
-
 
     for (let i = 0; i < max; i++) {
       const p = this.boardArr[i];
