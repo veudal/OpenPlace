@@ -35,11 +35,13 @@ export class HomeComponent implements OnInit {
   audio: HTMLAudioElement = new Audio("assets/sfx/place.mp3");
   pickr: Pickr | null = null;
 
-  hoverPixel: HoverPixel = new HoverPixel(-1, -1, "");
+  hoverPixel: HoverPixel = new HoverPixel(-1, -1, "", "");
   boardArr: Pixel[] = [];
+  userFilter: string | null = null;
   pixelQueue: Pixel[] = [];
   dimensions: BoardSize = { width: environment.boardWidth, height: environment.boardHeight };
   panzoom: PanzoomObject = null!;
+  leaderboard: Leaderboard[] = [];
 
   selectedColor: number = 0;
 
@@ -51,6 +53,13 @@ export class HomeComponent implements OnInit {
     vertical: true,
     showSelectionBar: true,
     rightToLeft: true,
+    selectionBarGradient: {
+      from: 'skyblue',
+      to: '#8048fa'
+    },
+    getPointerColor: () => {
+      return '#8048fa';
+    },
     translate: (value: number): string => {
       if (value == 0) {
         return `
@@ -77,12 +86,17 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.init();
+    this.initPanzoom();
     this.initCanvasEvents();
     this.initWindowResizeEvent();
     this.initSignalR();
     this.initDocumentEvents();
     this.initPaletteContainer();
     this.initColorPicker();
+  }
+
+  private initPanzoom() {
+    this.updateZoompanFromParams();
     this.panzoom = Panzoom(this.canvas, {
       contain: 'outside',
       cursor: 'pointer',
@@ -92,7 +106,6 @@ export class HomeComponent implements OnInit {
     });
     this.restorePanzoomState();
   }
-
 
   private initColorPicker() {
     this.pickr = Pickr.create({
@@ -143,7 +156,6 @@ export class HomeComponent implements OnInit {
     this.context = this.canvas.getContext("2d");
     this.canvas.setAttribute('tabindex', '0');
 
-    this.updateZoompanFromParams();
 
     await this.loadBoard();
   }
@@ -177,7 +189,8 @@ export class HomeComponent implements OnInit {
   }
 
   private handleMouseOver() {
-    if (!this.pickr?.isOpen() && this.sliderDragState == false) {
+    this.pickr?.hide();
+    if (this.sliderDragState == false) {
       this.canvas.focus()
     }
   }
@@ -218,7 +231,7 @@ export class HomeComponent implements OnInit {
 
   private handleColorDivClick(colorDiv: HTMLDivElement) {
     const index = parseInt(colorDiv.id.substring(0, colorDiv.id.indexOf('-')));
-    this.updatePaletteSelection(this.colorPalette[index]);
+    this.updatePaletteSelection(null, index);
 
     if (this.selectedColor == 0) {
       this.pickr?.show();
@@ -235,24 +248,34 @@ export class HomeComponent implements OnInit {
 
     this.signalRService.startConnection().subscribe(() => {
       this.signalRService.receiveMessage().subscribe((message: any) => {
-        this.receivePixel(message);
+
+        const obj = JSON.parse(message);
+        if (obj.type == "Broadcast") {
+          if (!this.username) {
+            this.username = "Anonymous";
+          }
+          if (obj.username.toLowerCase() == this.username!.toLowerCase()) {
+            alert("Admin: " + obj.info)
+          }
+        }
+        else {
+          this.receivePixel(obj);
+        }
       });
     });
   }
 
-  private receivePixel(message: string) {
-    const receivedPixel = JSON.parse(message);
+  private receivePixel(receivedPixel: any) {
     if (receivedPixel.placedBy == "") {
       receivedPixel.placedBy = this.defaultUsername;
     }
 
     this.boardArr.push(receivedPixel);
 
-    if (this.sliderValue + 1 == this.boardArr.length) {
-      this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
-      if (this.isSliderVisible) {
-        this.setSliderToMax();
-      }
+    const isLastPixel = this.sliderValue + 1 == this.boardArr.length;
+
+    if (this.isSliderVisible && isLastPixel) {
+      this.setSliderToMax();
     }
     else {
       this.sliderOptions = {
@@ -260,13 +283,16 @@ export class HomeComponent implements OnInit {
         ceil: this.boardArr.length
       };
     }
+    if (isLastPixel && !this.userFilter || this.userFilter == receivedPixel.placedBy) {
+      this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
+    }
 
     this.updateLeaderboard();
   }
 
   private initDocumentEvents() {
-    document.addEventListener('wheel', (e: WheelEvent) => e.preventDefault(), { passive: false });
-    document.addEventListener('keydown', (e: KeyboardEvent) => this.handleColorSelection(e));
+    document.addEventListener('wheel', (e: WheelEvent) => this.handleColorScrolling(e), { passive: false });
+    document.addEventListener('keydown', (e: KeyboardEvent) => this.handleKeydown(e));
     document.addEventListener("contextmenu", (e: Event) => e.preventDefault());
 
     document.addEventListener('selectionchange', () => {
@@ -281,42 +307,109 @@ export class HomeComponent implements OnInit {
       }
     });
   }
+  private handleColorScrolling(e: WheelEvent) {
+    e.preventDefault()
+    const id = (e.target as HTMLElement).id
+    if (e.shiftKey || e.ctrlKey || e.altKey || id == "palette-container" || id.endsWith("-color")) {
+      if (e.deltaY > 0) {
+        this.setSelectedColor("E");
+      }
+      else {
+        this.setSelectedColor("Q");
+      }
+    }
+  }
+
 
   private handleMouseDown(e: MouseEvent) {
     this.panzoom.setOptions({ disablePan: e.button != 2 })
   }
 
-  private handleColorSelection(e: KeyboardEvent) {
+  private handleKeydown(e: KeyboardEvent) {
     if (this.pickr?.isOpen()) {
       return;
     }
+    this.setSelectedColor(e.key.toUpperCase());
+
     if (e.code.startsWith("Digit")) {
       const key = e.code.slice(5);
       let index = 9;
       if (key != '0') {
         index = parseInt(key) - 1;
       }
-      this.updatePaletteSelection(this.colorPalette[index]);
-
-      this.drawHoverPixel(this.hoverPixel?.x ?? 0, this.hoverPixel?.y ?? 0, this.hoverPixel?.color ?? this.defaultColor, true);
-      this.pickr?.hide();
+      if (this.userFilter == this.leaderboard[index].name) {
+        this.resetUserFilter();
+        return;
+      }
+      this.userFilter = this.leaderboard[index].name;
+      this.updateLeaderboard();
+      this.drawBoard();
+      this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || new HoverPixel(-1, -1, "", "");
+    }
+    else if (e.key == "Escape") {
+      this.resetUserFilter();
+    }
+    else if (e.key == "+") {
+      this.panzoom.zoomIn();
+    }
+    else if (e.key == "-") {
+      this.panzoom.zoomOut();
+    }
+    else if (e.key == " ") {
+      this.updatePaletteSelection(null, 0);
     }
   }
 
-  private updatePaletteSelection(c: string) {
+  private setSelectedColor(key: string) {
+    let index = this.selectedColor;
+    if (key == "Q") {
+      index = Math.max(0, this.selectedColor - 1);
+    }
+    else if (key == "E") {
+      index = Math.min(this.colorPalette.length - 1, this.selectedColor + 1);
+    }
+    else {
+      return;
+    }
+
+    this.updatePaletteSelection(null, index);
+    this.drawHoverPixel(this.hoverPixel?.x ?? 0, this.hoverPixel?.y ?? 0, this.hoverPixel?.color ?? this.defaultColor, this.hoverPixel.placedBy, true);
+    this.pickr?.hide();
+  }
+
+  private resetUserFilter() {
+    this.userFilter = null;
+    this.updateLeaderboard();
+    this.drawBoard();
+    this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || new HoverPixel(-1, -1, "", "");
+  }
+
+  private updatePaletteSelection(c: string | null, index: number | null = null) {
 
     const old = document.getElementById(this.selectedColor.toString() + "-color")!;
     old.style.border = '2px solid #ffffff';
     old.style.transform = 'scale(1.0)';
 
-    this.selectedColor = Math.max(this.colorPalette.indexOf(c), 0);
+    if (c) {
+      c = c.toUpperCase();
+      this.selectedColor = Math.max(this.colorPalette.lastIndexOf(c), 0);
+    }
+    else if (index != null) {
+      this.selectedColor = index;
+    }
 
     const colorDiv = document.getElementById(this.selectedColor.toString() + "-color")!;
     colorDiv.style.border = '3px solid #0080FF';
     colorDiv.style.transform = 'scale(1.3)';
 
     if (this.selectedColor == 0) {
-      this.colorPalette[0] = c;
+      if (c) {
+        this.colorPalette[0] = c;
+      }
+      else if (index) {
+        this.colorPalette[0] = this.colorPalette[index]
+      }
+      this.pickr?.setColor(c);
       colorDiv.style.backgroundColor = "#" + c;
       localStorage.setItem("customColor", this.colorPalette[0]);
     }
@@ -336,7 +429,7 @@ export class HomeComponent implements OnInit {
       }
     }
     this.updatePaletteSelection(pixel.color);
-    this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel?.color ?? this.defaultColor, true);
+    this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel?.color ?? this.defaultColor, this.hoverPixel.placedBy, true);
   }
   private handleMovement(e: KeyboardEvent) {
     e.preventDefault();
@@ -397,9 +490,15 @@ export class HomeComponent implements OnInit {
   }
 
   private setPixel(e: MouseEvent) {
-    if (this.sliderValue != this.sliderOptions.ceil) {
+    if (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null) {
       //Exit history mode
+
+      if (this.userFilter) {
+        this.userFilter = null;
+        this.updateLeaderboard();
+      }
       this.setSliderToMax();
+
       this.drawBoard();
 
       this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || this.hoverPixel;
@@ -443,10 +542,12 @@ export class HomeComponent implements OnInit {
     const y = this.calculateYPosition(e.clientY, rect);
     const pixel = this.findLatestPixel(x, y);
 
-    this.drawHoverPixel(x, y, pixel?.color, false);
+    this.drawHoverPixel(x, y, pixel?.color, pixel?.placedBy, false);
 
     if (pixel) {
-
+      if (this.userFilter && this.userFilter != pixel.placedBy) {
+        return;
+      }
       const text = `(${pixel.x}, ${pixel.y}) ${pixel.placedBy || this.defaultUsername}<br/>${this.getLocalDate(pixel.timestamp)}`;
       this.showBubble(text, e.clientX, e.clientY);
     }
@@ -473,7 +574,7 @@ export class HomeComponent implements OnInit {
     }
     for (let i = max - 1; i >= 0; i--) {
       const item = this.boardArr[i];
-      if (item.x === x && item.y === y) {
+      if ((!this.userFilter || this.userFilter == item.placedBy) && item.x === x && item.y === y) {
         return item;
       }
     }
@@ -505,20 +606,19 @@ export class HomeComponent implements OnInit {
   private onLeave() {
     if (this.hoverPixel) {
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
-      this.hoverPixel = new HoverPixel(-1, -1, "")
+      this.hoverPixel = new HoverPixel(-1, -1, "", "")
     }
     this.hideBubble(false);
   }
 
-  private drawHoverPixel(x: number, y: number, color: any, force: boolean) {
+  private drawHoverPixel(x: number, y: number, color: any, username: any, force: boolean) {
     if (!this.hoverPixel) {
-      this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor);
+      this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor, username);
     }
     else if (this.hoverPixel.x !== x || this.hoverPixel.y !== y || force) {
-
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
 
-      this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor);
+      this.hoverPixel = new HoverPixel(x, y, color || this.defaultColor, username);
       this.drawPixel(x, y, this.colorPalette[this.selectedColor]);
     }
   }
@@ -568,7 +668,7 @@ export class HomeComponent implements OnInit {
         this.boardArr.push(p);
       });
       this.drawBoard();
-      this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, true)
+      this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, this.hoverPixel.placedBy, true)
       this.updateLeaderboard();
 
       offset += limit;
@@ -592,7 +692,6 @@ export class HomeComponent implements OnInit {
 
 
   private setSliderToMax() {
-
     this.sliderOptions = {
       ...this.sliderOptions,
       ceil: this.boardArr.length
@@ -601,33 +700,41 @@ export class HomeComponent implements OnInit {
   }
 
   private updateLeaderboard() {
-    const leaderboard: Leaderboard[] = [];
-    for (const pixel of this.boardArr) {
+    this.leaderboard = [];
 
-      const existingEntry = leaderboard.find(item => item.name === pixel.placedBy);
+    let max = this.boardArr.length;
+    if (this.isSliderVisible) {
+      max = this.sliderValue;
+    }
+
+    for (let i = 0; i < max; i++) {
+      const pixel = this.boardArr[i];
+      const existingEntry = this.leaderboard.find(item => item.name === pixel.placedBy);
       if (existingEntry) {
         existingEntry.placedPixels++;
       }
       else {
-        leaderboard.push({ name: pixel.placedBy, placedPixels: 1 });
+        this.leaderboard.push({ name: pixel.placedBy, placedPixels: 1 });
       }
     };
 
     const list = document.getElementById('leaderboard-list')!;
     list.innerHTML = '';
-    leaderboard.sort((a, b) => b.placedPixels - a.placedPixels);
+    this.leaderboard.sort((a, b) => b.placedPixels - a.placedPixels);
 
-    for (let i = 0; i < Math.min(10, leaderboard.length); i++) {
-      const position = i + 1;
-      const element = document.createElement('li');
-      element.className = 'leaderboard-item';
+    for (let i = 0; i < Math.min(10, this.leaderboard.length); i++) {
+      if (!this.userFilter || this.userFilter == this.leaderboard[i].name) {
+        const position = i + 1;
+        const element = document.createElement('li');
+        element.className = 'leaderboard-item';
 
-      element.innerHTML = `
+        element.innerHTML = `
         <span class="position">${position}.</span>
-        <span class="name">${leaderboard[i].name}</span>
-        <span class="score">${leaderboard[i].placedPixels}</span>
+        <span class="name">${this.leaderboard[i].name}</span>
+        <span class="score">${this.leaderboard[i].placedPixels}</span>
         `;
-      list.appendChild(element);
+        list.appendChild(element);
+      }
     }
 
   }
@@ -635,9 +742,7 @@ export class HomeComponent implements OnInit {
   public onSliderChange(): void {
     setTimeout(() => {
       this.drawBoard();
-
-      //Add this in future?
-      //this.updateLeaderboard()
+      this.updateLeaderboard()
     }, 20);
   }
 
@@ -708,6 +813,11 @@ export class HomeComponent implements OnInit {
 
 
   private drawBoard() {
+
+    const temp = [...this.boardArr];
+
+
+
     let max = this.boardArr.length;
     if (this.isSliderVisible) {
       max = this.sliderValue;
@@ -717,9 +827,11 @@ export class HomeComponent implements OnInit {
 
     for (let i = 0; i < max; i++) {
       const p = this.boardArr[i];
-      this.drawPixel(p.x, p.y, p.color);
-
+      if (!this.userFilter || p.placedBy == this.userFilter) {
+        this.drawPixel(p.x, p.y, p.color);
+      }
     }
+    this.boardArr = temp;
   }
 
   private drawPixel(x: number, y: number, c: string) {
@@ -751,7 +863,9 @@ export class HomeComponent implements OnInit {
   }
 
   private onWheel(e: WheelEvent) {
-    //this.updateScale(e)
+    if (e.shiftKey || e.ctrlKey || e.altKey) {
+      return;
+    }
     this.panzoom.zoomWithWheel(e, { animate: true });
     this.savePanzoomState();
   }
