@@ -27,9 +27,11 @@ export class HomeComponent implements OnInit {
   colorPalette: string[] = ['000000', 'FFFFFF', 'B9C3CF', '777F8C', '424651', '1F1E26', '000000', '382215', '7C3F20', 'C06F37', 'FEAD6C', 'FFD2B1', 'FFA4D0',
     'F14FB4', 'E973FF', 'A630D2', '531D8C', '242367', '0334BF', '149CFF', '8DF5FF', '01BFA5', '16777E', '054523', '18862F',
     '61E021', 'B1FF37', 'FFFFA5', 'FDE111', 'FF9F17', 'F66E08', '550022', '99011A', 'F30F0C', 'FF7872'];
+
   defaultColor: string = "FFFFFF";
-  username: string | null = localStorage.getItem("username");
   defaultUsername: string = "Anonymous";
+  username: string = this.defaultUsername;
+
   timeoutId: number | null = null;
 
   audio: HTMLAudioElement = new Audio("assets/sfx/place.mp3");
@@ -45,6 +47,7 @@ export class HomeComponent implements OnInit {
 
   selectedColor: number = 0;
 
+  debounceTimeout: any = null;
   sliderValue = 0;
   sliderDragState = false;
   isSliderVisible = false; //Has to be false until board has been loaded
@@ -85,7 +88,8 @@ export class HomeComponent implements OnInit {
   constructor(private signalRService: SignalRService, private router: Router, private route: ActivatedRoute) { }
 
   ngOnInit() {
-    this.init();
+    this.initCanvas();
+    this.initUsername();
     this.initPanzoom();
     this.initCanvasEvents();
     this.initWindowResizeEvent();
@@ -93,6 +97,13 @@ export class HomeComponent implements OnInit {
     this.initDocumentEvents();
     this.initPaletteContainer();
     this.initColorPicker();
+  }
+
+  private initUsername() {
+    const storedUsername = localStorage.getItem("username");
+    if (storedUsername) {
+      this.username = storedUsername;
+    }
   }
 
   private initPanzoom() {
@@ -146,7 +157,7 @@ export class HomeComponent implements OnInit {
     });
   }
 
-  private async init() {
+  private async initCanvas() {
 
     // Initialize canvas
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -182,6 +193,7 @@ export class HomeComponent implements OnInit {
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
     this.canvas.addEventListener('keydown', (e: KeyboardEvent) => this.handleMovement(e));
     this.canvas.addEventListener('pointerdown', (e: MouseEvent) => this.handleMouseDown(e));
+    this.canvas.addEventListener('pointerup', (e: MouseEvent) => this.handleMouseUp(e));
     this.canvas.addEventListener("pointermove", this.onHover.bind(this));
     this.canvas.addEventListener("pointerleave", this.onLeave.bind(this));
     this.canvas.addEventListener('pointerover', () => this.handleMouseOver());
@@ -250,10 +262,7 @@ export class HomeComponent implements OnInit {
 
         const obj = JSON.parse(message);
         if (obj.type == "Broadcast") {
-          if (!this.username) {
-            this.username = "Anonymous";
-          }
-          if (obj.username.toLowerCase() == this.username!.toLowerCase()) {
+          if (obj.username.toLowerCase() == this.username.toLowerCase()) {
             alert("Admin: " + obj.info)
           }
         }
@@ -319,9 +328,7 @@ export class HomeComponent implements OnInit {
     }
   }
 
-
-  private handleMouseDown(e: MouseEvent) {
-    this.panzoom.setOptions({ disablePan: e.button != 2 });
+  private handleMouseUp(e: MouseEvent) {
 
     if (e.button == 1 || e.button == 2) {
       const pan = this.panzoom.getPan();
@@ -331,8 +338,6 @@ export class HomeComponent implements OnInit {
 
       const xMatch = Math.abs(Math.round(pan.x) - stored.x) <= tolerance;
       const yMatch = Math.abs(Math.round(pan.y) - stored.y) <= tolerance;
-
-
       if (xMatch && yMatch) {
         this.getColor(e);
       }
@@ -340,6 +345,11 @@ export class HomeComponent implements OnInit {
     else if (e.button == 0) {
       this.setPixel(e);
     }
+  }
+
+
+  private handleMouseDown(e: MouseEvent) {
+    this.panzoom.setOptions({ disablePan: e.button != 2 });
   }
 
   private handleKeydown(e: KeyboardEvent) {
@@ -492,13 +502,10 @@ export class HomeComponent implements OnInit {
   private setPixel(e: MouseEvent) {
     if (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null) {
       //Exit history mode
-
-      if (this.userFilter) {
-        this.userFilter = null;
-        this.updateLeaderboard();
-      }
       this.setSliderToMax();
 
+      this.userFilter = null;
+      this.updateLeaderboard();
       this.drawBoard();
 
       this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || this.hoverPixel;
@@ -564,7 +571,16 @@ export class HomeComponent implements OnInit {
       hour: '2-digit',
       minute: '2-digit',
     };
-    return new Date(date).toLocaleDateString(undefined, options)
+
+    const userLocale = navigator.language || undefined;
+    let localizedDate = new Date(date).toLocaleDateString(userLocale, options);
+
+    console.log(userLocale)
+    if (userLocale?.startsWith('de') || userLocale?.startsWith('en-GB')) {
+      localizedDate = localizedDate.replace(/\//g, '.'); //replace / with . for german culture
+    }
+
+    return localizedDate;
   }
 
   private findLatestPixel(x: number, y: number) {
@@ -659,8 +675,12 @@ export class HomeComponent implements OnInit {
       do {
 
         const result = await fetch(environment.endpointUrl + `/GetRange?offset=${offset}&limit=${limit}`);
-        pixels = await result.json();
+        if (!result.ok) {
+          alert("This site is currently under maintenance.");
+          return;
+        }
 
+        pixels = await result.json();
         pixels.forEach((p: Pixel) => {
           if (p.placedBy == "") {
             p.placedBy = this.defaultUsername;
@@ -676,10 +696,7 @@ export class HomeComponent implements OnInit {
       while (pixels.length == limit);
     }
     catch (error: any) {
-      if (error instanceof Error && error.message.toLowerCase().includes('fetch')) {
-        alert("This site is currently under maintenance.");
-      }
-      else {
+      if (error instanceof Error && !error.message.toLowerCase().includes('fetch')) {
         alert("An error occured while loading the canvas: " + error.message);
       }
     }
@@ -700,11 +717,13 @@ export class HomeComponent implements OnInit {
 
 
   private setSliderToMax() {
-    this.sliderOptions = {
-      ...this.sliderOptions,
-      ceil: this.boardArr.length
-    };
-    this.sliderValue = this.sliderOptions.ceil;
+    setTimeout(() => {
+      this.sliderOptions = {
+        ...this.sliderOptions,
+        ceil: this.boardArr.length
+      };
+      this.sliderValue = this.sliderOptions.ceil
+    });
   }
 
   private updateLeaderboard() {
@@ -747,11 +766,13 @@ export class HomeComponent implements OnInit {
 
   }
 
-  public onSliderChange(): void {
-    setTimeout(() => {
+  public async onSliderChange() {
+    clearTimeout(this.debounceTimeout);
+
+    this.debounceTimeout = setTimeout(() => {
       this.drawBoard();
-      this.updateLeaderboard()
-    }, 20);
+      this.updateLeaderboard();
+    }, 1);
   }
 
   public onSliderStart(): void {
@@ -779,11 +800,11 @@ export class HomeComponent implements OnInit {
     const originalPixel = this.findLatestPixel(x, y);
 
     //Abort task if same pixel by same user already exits.
-    if (originalPixel && originalPixel.color === color && originalPixel.placedBy === (this.username || this.defaultUsername)) {
+    if (originalPixel && originalPixel.color === color && originalPixel.placedBy === this.username) {
       return;
     }
 
-    const newPixel = new Pixel(x, y, color, this.username || this.defaultUsername, "")
+    const newPixel = new Pixel(x, y, color, this.username, "")
     if (this.getIndex(newPixel) != -1) {
       return;
     }
@@ -821,22 +842,15 @@ export class HomeComponent implements OnInit {
 
 
   private drawBoard() {
+    let max = this.isSliderVisible ? this.sliderValue : this.boardArr.length;
 
-    const temp = [...this.boardArr];
-
-    let max = this.boardArr.length;
-    if (this.isSliderVisible) {
-      max = this.sliderValue;
-    }
     this.context.clearRect(0, 0, this.dimensions.width, this.dimensions.height)
-
     for (let i = 0; i < max; i++) {
       const p = this.boardArr[i];
       if (!this.userFilter || p.placedBy == this.userFilter) {
         this.drawPixel(p.x, p.y, p.color);
       }
     }
-    this.boardArr = temp;
   }
 
   private drawPixel(x: number, y: number, c: string) {
@@ -859,7 +873,7 @@ export class HomeComponent implements OnInit {
   public usernameChange(event: Event) {
     const val = (event.target as HTMLInputElement).value
     if (val.length > 16) {
-      (event.target as HTMLInputElement).value = this.username || "";
+      (event.target as HTMLInputElement).value = this.username;
       alert("Username cannot be longer than 16 characters.");
       return;
     }
