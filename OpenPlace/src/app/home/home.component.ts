@@ -384,14 +384,14 @@ export class HomeComponent implements OnInit {
       this.panzoom.zoomOut();
       this.savePanzoomState();
     }
-    else if (e.key == " ") {
-      this.updatePaletteSelection(null, 0);
-    }
   }
 
   private setSelectedColor(key: string) {
     let index = this.selectedColor;
-    if (key == "Q") {
+    if (key == " ") {
+      index = 0;
+    }
+    else if (key == "Q") {
       index = Math.max(0, this.selectedColor - 1);
     }
     else if (key == "E") {
@@ -575,11 +575,9 @@ export class HomeComponent implements OnInit {
     const userLocale = navigator.language || undefined;
     let localizedDate = new Date(date).toLocaleDateString(userLocale, options);
 
-    console.log(userLocale)
     if (userLocale?.startsWith('de') || userLocale?.startsWith('en-GB')) {
-      localizedDate = localizedDate.replace(/\//g, '.'); //replace / with . for german culture
+      localizedDate = localizedDate.replace(/\//g, '.');  //replaces / with . for german culture
     }
-
     return localizedDate;
   }
 
@@ -667,7 +665,7 @@ export class HomeComponent implements OnInit {
   }
 
   private async loadBoard() {
-    const limit = 10000;
+    const limit = 25000;
     let offset = 0;
     let pixels;
 
