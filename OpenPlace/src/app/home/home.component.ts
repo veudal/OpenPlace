@@ -503,6 +503,7 @@ export class HomeComponent implements OnInit {
     if (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null) {
       //Exit history mode
       this.setSliderToMax();
+      this.sliderValue = this.sliderOptions.ceil; //Required because drawBoard will be exectued before setSliderToMax due to setTimeout otherwise slider would glitch
 
       this.userFilter = null;
       this.updateLeaderboard();
