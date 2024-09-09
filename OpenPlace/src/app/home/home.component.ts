@@ -127,6 +127,7 @@ export class HomeComponent implements OnInit {
       autoReposition: true,
       default: this.colorPalette[0],
       swatches: this.colorPalette.slice(2),
+      lockOpacity: true,
 
       components: {
 
@@ -152,7 +153,7 @@ export class HomeComponent implements OnInit {
     this.pickr.on('change', (color: any) => {
       const hexa = color.toHEXA();
       const c = hexa[0] + hexa[1] + hexa[2];
-      this.colorPalette[0] = c;
+      //console.log(this.colorPalette[0]);
       this.updatePaletteSelection(c);
     });
   }
@@ -200,8 +201,7 @@ export class HomeComponent implements OnInit {
   }
 
   private handleMouseOver() {
-    this.pickr?.hide();
-    if (this.sliderDragState == false) {
+    if (!this.sliderDragState && !this.pickr?.isOpen()) {
       this.canvas.focus()
     }
   }
@@ -315,6 +315,7 @@ export class HomeComponent implements OnInit {
       }
     });
   }
+
   private handleColorScrolling(e: WheelEvent) {
     e.preventDefault()
     const id = (e.target as HTMLElement).id
@@ -339,7 +340,7 @@ export class HomeComponent implements OnInit {
       const xMatch = Math.abs(Math.round(pan.x) - stored.x) <= tolerance;
       const yMatch = Math.abs(Math.round(pan.y) - stored.y) <= tolerance;
       if (xMatch && yMatch) {
-        this.getColor(e);
+        this.colorPicker(e);
       }
     }
     else if (e.button == 0) {
@@ -347,9 +348,9 @@ export class HomeComponent implements OnInit {
     }
   }
 
-
   private handleMouseDown(e: MouseEvent) {
     this.panzoom.setOptions({ disablePan: e.button != 2 });
+    this.pickr?.hide();
   }
 
   private handleKeydown(e: KeyboardEvent) {
@@ -433,18 +434,17 @@ export class HomeComponent implements OnInit {
 
     if (this.selectedColor == 0) {
       if (c) {
-        this.colorPalette[0] = c;
+        this.colorPalette[0] = c.toUpperCase();
       }
       else if (index) {
         this.colorPalette[0] = this.colorPalette[index]
       }
-      this.pickr?.setColor(c);
       colorDiv.style.backgroundColor = "#" + c;
       localStorage.setItem("customColor", this.colorPalette[0]);
     }
   }
 
-  private getColor(e: MouseEvent) {
+  private colorPicker(e: MouseEvent) {
     const rect = this.canvas.getBoundingClientRect();
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
@@ -458,6 +458,9 @@ export class HomeComponent implements OnInit {
       }
     }
     this.updatePaletteSelection(pixel.color);
+    if (this.selectedColor == 0) {
+      this.pickr?.setColor("#" + pixel.color);
+    }
     this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel?.color ?? this.defaultColor, this.hoverPixel.placedBy, true);
   }
   private handleMovement(e: KeyboardEvent) {
@@ -500,7 +503,7 @@ export class HomeComponent implements OnInit {
 
 
   private setPixel(e: MouseEvent) {
-    if (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null) {
+    if (!this.sliderDragState && (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null)) {
       //Exit history mode
       this.setSliderToMax();
       this.sliderValue = this.sliderOptions.ceil; //Required because drawBoard will be exectued before setSliderToMax due to setTimeout otherwise slider would glitch
@@ -560,7 +563,7 @@ export class HomeComponent implements OnInit {
       this.showBubble(text, e.clientX, e.clientY);
     }
     else {
-      this.hideBubble(true);
+      this.hideBubble();
     }
   }
 
@@ -605,25 +608,12 @@ export class HomeComponent implements OnInit {
     return Math.floor((mouse - rect.top) / rect.height * this.dimensions.height);
   }
 
-  private hideBubble(checkForMessage: boolean) {
-    const bubble = document.getElementById("bubble");
-
-    if (checkForMessage && bubble?.innerText.startsWith("Wait")) {
-      return;
-    }
-
-    if (bubble) {
-      bubble.style.visibility = "hidden";
-      bubble.style.opacity = "0";
-    }
-  }
-
   private onLeave() {
     if (this.hoverPixel) {
       this.drawPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color);
       this.hoverPixel = new HoverPixel(-1, -1, "", "")
     }
-    this.hideBubble(false);
+    this.hideBubble();
   }
 
   private drawHoverPixel(x: number, y: number, color: any, username: any, force: boolean) {
@@ -638,9 +628,22 @@ export class HomeComponent implements OnInit {
     }
   }
 
+  private hideBubble() {
+    const bubble = document.getElementById("bubble");
+
+    if (bubble) {
+      bubble.innerHTML = "";
+      bubble.style.visibility = "hidden";
+      bubble.style.opacity = "0";
+    }
+  }
 
   private showBubble(text: string, clientX: number, clientY: number) {
     const div = document.getElementById("bubble")!;
+    if (div.innerHTML.startsWith("Wait")) {
+      return;
+    }
+
     const rect = this.canvas.getBoundingClientRect();
     div.innerHTML = text;
 
@@ -661,8 +664,7 @@ export class HomeComponent implements OnInit {
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
     }
-    this.timeoutId = setTimeout(this.hideBubble, 2000);
-
+    this.timeoutId = setTimeout(this.hideBubble, 2000) as unknown as number;
   }
 
   private async loadBoard() {
@@ -822,19 +824,22 @@ export class HomeComponent implements OnInit {
         body: JSON.stringify(newPixel)
       })
 
+      this.pixelQueue.splice(this.getIndex(newPixel), 1);
+
       if (response.ok) {
-        this.pixelQueue.splice(this.getIndex(newPixel), 1);
         this.increaseCounter();
         console.log('Success.');
       }
       else if (response.status === 429) {
         this.showBubble(`Wait ${response.headers.get("retry-after")} seconds.`, e.clientX, e.clientY);
+        this.hoverPixel = new HoverPixel(-1, -1, "", "");
         this.drawBoard();
       }
     }
     catch (e) {
-      this.hoverPixel = originalPixel!;
-      this.drawBoard()
+      this.pixelQueue.splice(this.getIndex(newPixel), 1);
+      this.hoverPixel = new HoverPixel(-1, -1, "", "");
+      this.drawBoard();
       console.log(e);
     }
   }
@@ -842,7 +847,6 @@ export class HomeComponent implements OnInit {
 
   private drawBoard() {
     let max = this.isSliderVisible ? this.sliderValue : this.boardArr.length;
-
     this.context.clearRect(0, 0, this.dimensions.width, this.dimensions.height)
     for (let i = 0; i < max; i++) {
       const p = this.boardArr[i];
@@ -886,23 +890,6 @@ export class HomeComponent implements OnInit {
     }
     this.panzoom.zoomWithWheel(e, { animate: true });
     this.savePanzoomState();
-  }
-
-  private updateScale(e: WheelEvent): void {
-    let scale = this.panzoom.getScale();
-    if (e.deltaY < 0) {
-      scale++
-    }
-    else {
-      scale--;
-    }
-    const rect = this.canvas.getBoundingClientRect();
-
-    // Calculate the mouse position relative to the panzoom element
-    const focalX = (e.clientX - rect.left) / rect.width;
-    const focalY = (e.clientY - rect.top) / rect.height;
-    this.panzoom.zoomToPoint(scale, { clientX: focalX, clientY: focalY }, { animate: true })
-
   }
 
   private savePanzoomState() {
