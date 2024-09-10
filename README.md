@@ -7,14 +7,20 @@ DISCLAIMER: User-generated content may not be monitored and you may encounter in
 # How to use (tricks & extra infos)
 
 - Press left-click to place a pixel.
-- Press right-click on a pixel to set your drawing color to the color of that pixel.
-- Use the 0-9 keys on your keyboard to select the a specific color on the color palette.
+- Press mousewheel or right-click on a pixel to set your drawing color to the color of that pixel.
+- Use the 0-9 keys on your keyboard to view only the pixels placed by one of the top 10 usernames on the leaderboard.
+- Press escape to exit history mode (set the slider to max) and show the pixels of all users.
 - Hover over a pixel in order to view its (X|Y) coordinates, username and the timestamp of its last update.
 - The first color in the color palette is a special one. Once clicked, you can choose a completly custom color from the color picker.
 - Every placed pixel stores a username. Make sure to set one in the username box, otherwise your pixels will be shown as "Anonymous".
 - Use your scroll wheel on the canvas in order to zoom in or out on a certain point.
 - Use WASD (or the arrow keys) in order to move/navigate through the canvas. NOTE: Moving only works when the zoom level is greater than 1.
-
+- Press Q & E to either select the previous or next color in the palette.
+- Scroll the mousewheel while over the color palette or globally by holding either the CTRL, SHIFT or ALT key to scroll through the colors
+- Press - & + to either zoom in or out on the current center.
+- Press SPACE to select the first color (your custom color)
+- Pan (move around) on the canvas by holding right click and the moving the mouse.
+  
 . The stored username of placed pixels will not be changed with a new username.
 - The leaderboard counts by the usernames. If 2 people have the same one, all their totals will add up and be shown as one in the leaderboard.
 
