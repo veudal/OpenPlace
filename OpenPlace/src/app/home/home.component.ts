@@ -375,7 +375,8 @@ export class HomeComponent implements OnInit {
       this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || new HoverPixel(-1, -1, "", "");
     }
     else if (e.key == "Escape") {
-      this.resetUserFilter();
+
+      this.resetUserFilterAndHistoryMode();
     }
     else if (e.key == "+") {
       this.panzoom.zoomIn();
@@ -492,27 +493,31 @@ export class HomeComponent implements OnInit {
 
     const pan = this.panzoom.getPan();
     const zoom = this.panzoom.getScale();
-    const canvasWidth = this.canvas.clientWidth;
-    const canvasHeight = this.canvas.clientHeight;
-    const panX = pan.x + deltaX * canvasWidth / (zoom * 2);
-    const panY = pan.y + deltaY * canvasHeight / (zoom * 2);
+
+    const panX = pan.x + deltaX * this.canvas.clientWidth / (zoom * 2);
+    const panY = pan.y + deltaY * this.canvas.clientHeight / (zoom * 2);
+
     this.panzoom.pan(panX, panY, { animate: true, force: true });
 
+    const pixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y);
+    if (pixel) {
+      this.drawPixel(pixel.x, pixel.y, pixel.color);
+    }
     this.savePanzoomState();
   }
 
+  private resetUserFilterAndHistoryMode() {
+
+    this.setSliderToMax();
+    this.sliderValue = this.sliderOptions.ceil; //Required because drawBoard will be exectued before setSliderToMax due to setTimeout otherwise slider would glitch
+
+    this.resetUserFilter();
+  }
 
   private setPixel(e: MouseEvent) {
     if (!this.sliderDragState && (this.sliderValue != this.sliderOptions.ceil || this.userFilter != null)) {
+      this.resetUserFilterAndHistoryMode();
       //Exit history mode
-      this.setSliderToMax();
-      this.sliderValue = this.sliderOptions.ceil; //Required because drawBoard will be exectued before setSliderToMax due to setTimeout otherwise slider would glitch
-
-      this.userFilter = null;
-      this.updateLeaderboard();
-      this.drawBoard();
-
-      this.hoverPixel = this.findLatestPixel(this.hoverPixel.x, this.hoverPixel.y) || this.hoverPixel;
       return;
     }
 
