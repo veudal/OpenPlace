@@ -20,9 +20,10 @@ DISCLAIMER: User-generated content may not be monitored and you may encounter in
 - Press - & + to either zoom in or out on the current center.
 - Press SPACE to select the first color (your custom color)
 - Pan (move around) on the canvas by holding right click and the moving the mouse.
-  
-. The stored username of placed pixels will not be changed with a new username.
-- The leaderboard counts by the usernames. If 2 people have the same one, all their totals will add up and be shown as one in the leaderboard.
+
+  ### Additional info
+  - The stored username of placed pixels will not be changed with a new username.
+  - The leaderboard counts by the usernames. If 2 people have the same one, all their totals will add up and be shown as one in the leaderboard.
 
 # Screenshots
 
@@ -35,13 +36,20 @@ DISCLAIMER: User-generated content may not be monitored and you may encounter in
 Before creating anything, please read our [canvas guidelines](https://github.com/veudal/openplace/blob/master/rules.md)
 
 # Features
+
 - Usernames
-- Zoom
-- Moving
+- Canvas zoom
+- Keyboard shortcuts for zoom (- & +)
 - Automatic zoom and position recovery on opening
-- Hover/preview pixel on mouse over
-- Info bubbles for each pixel (timestamp, username and x|y coordinates)
-- 9 preset colors and one custom color
-- Color picker
+- Canvas movement (WASD or arrow keys)
+- Canvas panning
 - Realtime updates from other users
-- Keyboard shortcuts
+- User filter for top 10 users (by pixels placed)
+- Leaderboard
+- Pixel hover info (coordinates, username, timestamp)
+- Hover/preview pixel on mouse over
+- Info bubbles for each pixel (timestamp, username, and coordinates)
+- 34 preset colors and one custom color
+- Color picker
+- Color palette navigation shortcuts (Q & E, mousewheel, space)
+- History mode (slider)
