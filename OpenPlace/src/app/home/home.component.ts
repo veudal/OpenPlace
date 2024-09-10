@@ -632,9 +632,11 @@ export class HomeComponent implements OnInit {
     const bubble = document.getElementById("bubble");
 
     if (bubble) {
-      bubble.innerHTML = "";
       bubble.style.visibility = "hidden";
       bubble.style.opacity = "0";
+      if (bubble.innerHTML.startsWith("Wait")) {
+        bubble.innerHTML = "";
+      }
     }
   }
 
