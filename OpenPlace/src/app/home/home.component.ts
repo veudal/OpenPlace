@@ -67,19 +67,21 @@ export class HomeComponent implements OnInit {
       if (value == 0) {
         return `
       <div style="text-align: center; color: #8048fa; font-size: 14px">
-        <b>#${value} Pixel
+        <b># ${value} Pixel
       </div>`;
       }
 
       const p = this.boardArr[Math.max(value - 1, 0)];
       return `
       <div style="text-align: center; color: #8048fa; font-size: 14px">
-        <b>#${value} Pixel
+        <b># ${value} Pixel
         </b><br>${this.getLocalDate(p.timestamp)}
         </b><br>(${p.x} | ${p.y})
     </div>`;
     }
   };
+
+  grid: any;
 
   canvas: any;
   context: any;
@@ -97,6 +99,8 @@ export class HomeComponent implements OnInit {
     this.initDocumentEvents();
     this.initPaletteContainer();
     this.initColorPicker();
+
+
   }
 
   private initUsername() {
@@ -108,7 +112,7 @@ export class HomeComponent implements OnInit {
 
   private initPanzoom() {
     this.updateZoompanFromParams();
-    this.panzoom = Panzoom(this.canvas, {
+    this.panzoom = Panzoom(document.getElementById("canvasDiv")!, {
       contain: 'outside',
       cursor: 'pointer',
       step: 0.7,
@@ -153,7 +157,6 @@ export class HomeComponent implements OnInit {
     this.pickr.on('change', (color: any) => {
       const hexa = color.toHEXA();
       const c = hexa[0] + hexa[1] + hexa[2];
-      //console.log(this.colorPalette[0]);
       this.updatePaletteSelection(c);
     });
   }
@@ -168,6 +171,7 @@ export class HomeComponent implements OnInit {
     this.context = this.canvas.getContext("2d");
     this.canvas.setAttribute('tabindex', '0');
 
+    this.grid = document.getElementById('grid') as HTMLDivElement;
 
     await this.loadBoard();
   }
@@ -282,7 +286,7 @@ export class HomeComponent implements OnInit {
 
     const isLastPixel = this.sliderValue + 1 == this.boardArr.length;
 
-    if (this.isSliderVisible && isLastPixel) {
+    if (this.isSliderVisible && isLastPixel && this.userFilter == null) {
       this.setSliderToMax();
     }
     else {
@@ -385,6 +389,14 @@ export class HomeComponent implements OnInit {
     else if (e.key == "-") {
       this.panzoom.zoomOut();
       this.savePanzoomState();
+    }
+    else if (e.key.toUpperCase() == "G") {
+      if (this.grid.style.opacity == 0) {
+        this.grid.style.opacity = 1;
+      }
+      else {
+        this.grid.style.opacity = 0;
+      }
     }
   }
 
@@ -582,7 +594,7 @@ export class HomeComponent implements OnInit {
     };
 
     const userLocale = navigator.language || undefined;
-    let localizedDate = new Date(date).toLocaleDateString(userLocale, options);
+    let localizedDate = new Date(date).toLocaleDateString('de-DE', options);
 
     if (userLocale?.startsWith('de') || userLocale?.startsWith('en-GB')) {
       localizedDate = localizedDate.replace(/\//g, '.');  //replaces / with . for german culture
@@ -675,7 +687,7 @@ export class HomeComponent implements OnInit {
   }
 
   private async loadBoard() {
-    const limit = 25000;
+    const limit = 100000;
     let offset = 0;
     let pixels;
 
@@ -760,13 +772,15 @@ export class HomeComponent implements OnInit {
     for (let i = 0; i < Math.min(10, this.leaderboard.length); i++) {
       if (!this.userFilter || this.userFilter == this.leaderboard[i].name) {
         const position = i + 1;
+        const percentage = (this.leaderboard[i].placedPixels / this.boardArr.length * 100).toFixed(2);
+
         const element = document.createElement('li');
         element.className = 'leaderboard-item';
 
         element.innerHTML = `
         <span class="position">${position}.</span>
         <span class="name">${this.leaderboard[i].name}</span>
-        <span class="score">${this.leaderboard[i].placedPixels}</span>
+        <span class="score"># ${this.leaderboard[i].placedPixels}<br></br>${percentage}%</span>
         `;
         list.appendChild(element);
       }
@@ -822,13 +836,18 @@ export class HomeComponent implements OnInit {
       this.initSignalR();
     }
     try {
+      const pixelToSend = {
+        ...newPixel,
+        timestamp: new Date()
+      };
 
       const response = await fetch(environment.endpointUrl + "/SendPixel", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newPixel)
+
+        body: JSON.stringify(pixelToSend)
       })
 
       this.pixelQueue.splice(this.getIndex(newPixel), 1);
@@ -874,10 +893,21 @@ export class HomeComponent implements OnInit {
   }
 
   private resizeCanvas() {
-
     const max = Math.min(window.innerWidth, window.innerHeight / 1.2);
     this.canvas.style.width = max + 'px';
     this.canvas.style.height = max + 'px';
+
+    const rect = this.canvas.getBoundingClientRect();
+    const parentRect = this.canvas.parentElement.getBoundingClientRect();
+
+    const offsetX = rect.left - parentRect.left;
+    const offsetY = rect.top - parentRect.top;
+
+    this.grid.style.left = `${offsetX}px`;
+    this.grid.style.top = `${offsetY}px`;
+
+    this.grid.style.width = this.canvas.style.width;
+    this.grid.style.height = this.canvas.style.height;
   }
 
   public usernameChange(event: Event) {
