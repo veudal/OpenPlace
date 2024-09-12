@@ -4,6 +4,11 @@ A reddit r/place clone (online pixel art plattform where all users share a canva
 
 DISCLAIMER: User-generated content may not be monitored and you may encounter inappropriate material.
 
+Here is a timelapse of the first 100k pixels:
+
+https://github.com/user-attachments/assets/7572b5cd-b8eb-48a8-9dd8-fb09685679e2
+
+
 # How to use (tricks & extra infos)
 
 - Press left-click to place a pixel.
