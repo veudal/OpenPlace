@@ -12,6 +12,8 @@ import Panzoom, { PanzoomObject } from '@panzoom/panzoom';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { NgxSliderModule } from '@angular-slider/ngx-slider';
+import moment from 'moment';
+import 'moment/min/locales';
 
 @Component({
   selector: 'app-home',
@@ -99,8 +101,15 @@ export class HomeComponent implements OnInit {
     this.initDocumentEvents();
     this.initPaletteContainer();
     this.initColorPicker();
+    this.initLocale();
+  }
 
-
+  private initLocale() {
+    const userLocale = navigator.language
+      ? navigator.languages[0]
+      : navigator.language || 'en';
+    console.log(userLocale);
+    moment.locale(userLocale);
   }
 
   private initUsername() {
@@ -585,21 +594,14 @@ export class HomeComponent implements OnInit {
   }
 
   private getLocalDate(date: string) {
-    const options: Intl.DateTimeFormatOptions = {
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    };
+    let timestamp = moment.utc(date);
 
-    const userLocale = navigator.language || undefined;
-    let localizedDate = new Date(date).toLocaleDateString('de-DE', options);
-
-    if (userLocale?.startsWith('de') || userLocale?.startsWith('en-GB')) {
-      localizedDate = localizedDate.replace(/\//g, '.');  //replaces / with . for german culture
+    if (moment.utc().diff(timestamp, 'hours') < 24) {
+      return timestamp.fromNow();
+    } else
+    {
+      return timestamp.format("l") + " " + timestamp.format('LT');
     }
-    return localizedDate;
   }
 
   private findLatestPixel(x: number, y: number) {
