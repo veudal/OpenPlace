@@ -121,7 +121,7 @@ export class HomeComponent implements OnInit {
 
   private initPanzoom() {
     this.updateZoompanFromParams();
-    this.panzoom = Panzoom(document.getElementById("canvasDiv")!, {
+    this.panzoom = Panzoom(this.canvas, {
       contain: 'outside',
       cursor: 'pointer',
       step: 0.7,
@@ -171,7 +171,6 @@ export class HomeComponent implements OnInit {
   }
 
   private async initCanvas() {
-
     // Initialize canvas
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
     this.canvas.width = this.dimensions.width;
@@ -181,6 +180,8 @@ export class HomeComponent implements OnInit {
     this.canvas.setAttribute('tabindex', '0');
 
     this.grid = document.getElementById('grid') as HTMLDivElement;
+
+    this.resizeCanvas();
 
     await this.loadBoard();
   }
@@ -203,7 +204,6 @@ export class HomeComponent implements OnInit {
   }
 
   private initCanvasEvents() {
-    this.resizeCanvas();
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
     this.canvas.addEventListener('keydown', (e: KeyboardEvent) => this.handleMovement(e));
     this.canvas.addEventListener('pointerdown', (e: MouseEvent) => this.handleMouseDown(e));
@@ -266,6 +266,26 @@ export class HomeComponent implements OnInit {
     window.addEventListener('resize', () => {
       this.resizeCanvas();
     });
+  }
+
+  private resizeCanvas() {
+    const max = Math.min(window.innerWidth, window.innerHeight / 1.2);
+    this.canvas.style.width = max + 'px';
+    this.canvas.style.height = max + 'px';
+
+    const rect = this.canvas.getBoundingClientRect();
+    const parentRect = this.canvas.parentElement.getBoundingClientRect();
+
+    const offsetX = rect.left - parentRect.left;
+    const offsetY = rect.top - parentRect.top;
+
+    this.grid.style.left = `${rect.left}px`;
+    this.grid.style.top = `${rect.top}px`;
+
+    this.grid.style.width = this.canvas.style.width;
+    console.log(this.canvas.style.width);
+    this.grid.style.height = this.canvas.style.height;
+    console.log(offsetX);
   }
 
   private initSignalR() {
@@ -598,8 +618,7 @@ export class HomeComponent implements OnInit {
 
     if (moment.utc().diff(timestamp, 'hours') < 24) {
       return timestamp.fromNow();
-    } else
-    {
+    } else {
       return timestamp.format("l") + " " + timestamp.format('LT');
     }
   }
@@ -894,24 +913,6 @@ export class HomeComponent implements OnInit {
     this.context.fillRect(x, y, 1, 1);
   }
 
-  private resizeCanvas() {
-    const max = Math.min(window.innerWidth, window.innerHeight / 1.2);
-    this.canvas.style.width = max + 'px';
-    this.canvas.style.height = max + 'px';
-
-    const rect = this.canvas.getBoundingClientRect();
-    const parentRect = this.canvas.parentElement.getBoundingClientRect();
-
-    const offsetX = rect.left - parentRect.left;
-    const offsetY = rect.top - parentRect.top;
-
-    this.grid.style.left = `${offsetX}px`;
-    this.grid.style.top = `${offsetY}px`;
-
-    this.grid.style.width = this.canvas.style.width;
-    this.grid.style.height = this.canvas.style.height;
-  }
-
   public usernameChange(event: Event) {
     const val = (event.target as HTMLInputElement).value
     if (val.length > 16) {
@@ -928,7 +929,28 @@ export class HomeComponent implements OnInit {
       return;
     }
     this.panzoom.zoomWithWheel(e, { animate: true });
+    this.updateGrid();
     this.savePanzoomState();
+  }
+
+  private updateGrid() {
+    const rect = this.canvas.getBoundingClientRect();
+    const parentRect = this.canvas.parentElement.getBoundingClientRect();
+
+    const canvasWidth = rect.width;
+    const canvasHeight = rect.height;
+
+    const cellSize = 1.5; // Size of each grid cell in pixels
+    const thickness = 0.1; // Grid line thickness in pixels
+
+    // Calculate scale factors
+    const scaleX = canvasWidth / (this.dimensions.width * cellSize);
+    const scaleY = canvasHeight / (this.dimensions.height * cellSize);
+
+
+
+    // Apply scaling and translation
+    this.grid.style.transform = `scale(${scaleX}, ${scaleY}) translate(${thickness}px, ${thickness}px)`;
   }
 
   private savePanzoomState() {

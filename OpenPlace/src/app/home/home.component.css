@@ -7,19 +7,18 @@
 }
 
 #grid {
-  --grid-size: 1.5px;
   --grid-strength: 0.1px;
   --grid-color: #c7c7c7;
   position: absolute;
   transition: opacity .2s;
   opacity: 0;
-  transform-origin: top left;
   pointer-events: none;
-  /*transform: translate(1px, 1px) scale(1);*/
-  background-size: var(--grid-size) var(--grid-size);
-  background-image: linear-gradient(to right,#aaa 0.1px,transparent 0.1px),linear-gradient(to bottom,#aaa 0.1px,transparent 0.1px);
-  /* background-image: linear-gradient(to right, var(--grid-color) var(--grid-strength), transparent var(--grid-strength)), linear-gradient(to bottom, var(--grid-color) var(--grid-strength), transparent var(--grid-strength));*/
+  background-color: transparent;
+  transform-origin: top left;
+  background-size: 1.5px 1.5px;
+  background-image: linear-gradient(to right, var(--grid-color) var(--grid-strength), transparent var(--grid-strength)), linear-gradient(to bottom, var(--grid-color) var(--grid-strength), transparent var(--grid-strength));
 }
+
 
 
 .body {
