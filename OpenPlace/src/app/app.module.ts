@@ -10,11 +10,9 @@ import { HomeComponent } from './home/home.component';
 @NgModule({
   declarations: [
     AppComponent,
-    PrivacyPolicyComponent
   ],
   imports: [
     BrowserModule,
-    PrivacyPolicyComponent,
     AppRoutingModule,
     NgxSliderModule
   ],

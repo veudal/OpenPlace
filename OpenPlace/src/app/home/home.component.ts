@@ -108,7 +108,6 @@ export class HomeComponent implements OnInit {
     const userLocale = navigator.language
       ? navigator.languages[0]
       : navigator.language || 'en';
-    console.log(userLocale);
     moment.locale(userLocale);
   }
 
@@ -282,10 +281,9 @@ export class HomeComponent implements OnInit {
     this.grid.style.left = `${rect.left}px`;
     this.grid.style.top = `${rect.top}px`;
 
-    this.grid.style.width = this.canvas.style.width;
-    console.log(this.canvas.style.width);
-    this.grid.style.height = this.canvas.style.height;
-    console.log(offsetX);
+    this.grid.style.width = 100 + "px";
+    this.grid.style.height = 100+ "px";
+    console.log(parentRect.width);
   }
 
   private initSignalR() {
@@ -420,11 +418,13 @@ export class HomeComponent implements OnInit {
       this.savePanzoomState();
     }
     else if (e.key.toUpperCase() == "G") {
-      if (this.grid.style.opacity == 0) {
-        this.grid.style.opacity = 1;
-      }
-      else {
-        this.grid.style.opacity = 0;
+      if (isDevMode()) {
+        if (this.grid.style.opacity == 0) {
+          this.grid.style.opacity = 1;
+        }
+        else {
+          this.grid.style.opacity = 0;
+        }
       }
     }
   }
@@ -708,20 +708,27 @@ export class HomeComponent implements OnInit {
   }
 
   private async loadBoard() {
-    const limit = 100000;
-    let offset = 0;
+    //const limit = 100000;
+    //let offset = 0;
     let pixels;
 
     try {
-      do {
+      //do {
 
-        const result = await fetch(environment.endpointUrl + `/GetRange?offset=${offset}&limit=${limit}`);
+        const result = await fetch(environment.endpointUrl + `/GetRange`);
         if (!result.ok) {
           alert("This site is currently under maintenance.");
           return;
         }
 
-        pixels = await result.json();
+      pixels = await result.json();
+
+      //pixels.sort((a: Pixel, b: Pixel) => {
+      //  const timestampA = new Date(a.timestamp).getTime();
+      //  const timestampB = new Date(b.timestamp).getTime();
+      //  return timestampA - timestampB;
+      //});
+
         pixels.forEach((p: Pixel) => {
           if (p.placedBy == "") {
             p.placedBy = this.defaultUsername;
@@ -732,9 +739,9 @@ export class HomeComponent implements OnInit {
         this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.color, this.hoverPixel.placedBy, true)
         this.updateLeaderboard();
 
-        offset += limit;
-      }
-      while (pixels.length == limit);
+      //  offset += limit;
+      //}
+      //while (pixels.length == limit);
     }
     catch (error: any) {
       if (error instanceof Error && !error.message.toLowerCase().includes('fetch')) {
@@ -929,7 +936,7 @@ export class HomeComponent implements OnInit {
       return;
     }
     this.panzoom.zoomWithWheel(e, { animate: true });
-    this.updateGrid();
+    //this.updateGrid();
     this.savePanzoomState();
   }
 
