@@ -5,19 +5,29 @@
   <div>
     <div class="container">
       <div style="margin-right: 30px" class="color-picker"></div>
-      <div class="div">
+      <div  style="margin-left: 4vw" class="div">
         <div style="display: flex">
-          <div style="margin-left: 4vw">
-              <canvas style="flex: 1" class="canvas" id="canvas"></canvas>
-                <div id="grid" class="grid"></div>
+          <div>
+            <canvas style="flex: 1" class="canvas" id="canvas"></canvas>
+            <div id="grid" class="grid"></div>
+            <div class="loading-overlay" id="loadingOverlay">
+              <div>
+                <div class="dots">
+                  <div class="dot">•</div>
+                  <div class="dot">•</div>
+                  <div class="dot">•</div>
+                </div>
+                <p class="progress">{{progress}}</p>
+              </div>
             </div>
-         
+          </div>
           <div style="flex: 1;">
             <ngx-slider style="margin-left: 3vw" *ngIf="isSliderVisible" id="slider" [(value)]="sliderValue" [options]="sliderOptions" (userChange)="onSliderChange()" (userChangeStart)="onSliderStart()" (userChangeEnd)="onSliderEnd()"></ngx-slider>
           </div>
         </div>
-        <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
       </div>
+      <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
+
       <div style="height: 50%">
         <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
           <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>

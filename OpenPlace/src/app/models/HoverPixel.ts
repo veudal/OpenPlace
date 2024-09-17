@@ -2,7 +2,7 @@ export class HoverPixel {
   constructor(
     public x: number,
     public y: number,
-    public color: string,
-    public placedBy: string | null
+    public c: string,
+    public p: string | null
   ) {}
 }
