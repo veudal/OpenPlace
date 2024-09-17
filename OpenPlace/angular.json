@@ -45,6 +45,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/openplace",
               "budgets": [
                 {
                   "type": "initial",
