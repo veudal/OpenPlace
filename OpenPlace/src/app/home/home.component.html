@@ -10,7 +10,7 @@
           <div>
             <canvas style="flex: 1" class="canvas" id="canvas"></canvas>
             <div id="grid" class="grid"></div>
-            <div class="loading-overlay" id="loadingOverlay">
+            <div [ngStyle]="{'background-image': 'url(assets/loading.jpg)'}" class="loading-overlay" id="loadingOverlay">
               <div>
                 <div class="dots">
                   <div class="dot">•</div>
