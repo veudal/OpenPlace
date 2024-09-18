@@ -171,6 +171,12 @@
   text-align: center;
 }
 
+.estimate {
+  color: white;
+  font-size: 14px;
+  text-align: center;
+}
+
   .dot:nth-child(2) {
     animation-delay: 0.2s;
   }

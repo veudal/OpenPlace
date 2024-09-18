@@ -47,6 +47,7 @@ export class HomeComponent implements OnInit {
   panzoom: PanzoomObject = null!;
   leaderboard: Leaderboard[] = [];
   progress: string = "0.00 MB fetched...";
+  pixelEstimate: string = "(0 pixels)";
 
   selectedColor: number = 0;
 
@@ -726,7 +727,7 @@ export class HomeComponent implements OnInit {
 
       pixels = await result.json();
 
-      this.boardArr = this.boardArr.concat(pixels);
+      this.boardArr = this.boardArr.concat(pixels); // In case for the possibility future pagination
       this.drawBoard();
       this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.c, this.hoverPixel.p, true)
       this.updateLeaderboard();
@@ -761,7 +762,9 @@ export class HomeComponent implements OnInit {
           }
 
           totalMegabytes += value.length / 1024 ** 2;
-          this.progress = totalMegabytes.toFixed(2) + " MB fetched...";
+
+          this.progress = `${totalMegabytes.toFixed(2)} MB fetched...`;
+          this.pixelEstimate = `(~${Math.round(totalMegabytes * 14) * 1024} pixels)`;
           controller.enqueue(value);
           reader?.read().then(processText);
         };
@@ -812,7 +815,7 @@ export class HomeComponent implements OnInit {
     for (let i = 0; i < Math.min(10, this.leaderboard.length); i++) {
       if (!this.userFilter || this.userFilter == this.leaderboard[i].name) {
         const position = i + 1;
-        const percentage = (this.leaderboard[i].placedPixels / this.boardArr.length * 100).toFixed(2);
+        const percentage = (this.leaderboard[i].placedPixels / (this.sliderValue || this.boardArr.length) * 100).toFixed(2);
 
         const element = document.createElement('li');
         element.className = 'leaderboard-item';
@@ -935,6 +938,21 @@ export class HomeComponent implements OnInit {
         setPixel(p.c, p.x, p.y);
       }
     }
+
+    // Alternative code, but currently 4x slower:
+    //const map = new Map();
+    //for (let i = pixelLimit - 1; i >= 0; i--) {
+    //  const p = this.boardArr[i];
+
+    //  if (map.has(`${p.x},${p.y}`)) {
+    //    continue;
+    //  }
+    //  if (!this.userFilter || p.p == this.userFilter) {
+    //    map.set(`${p.x},${p.y}`, undefined);
+    //    setPixel(p.c, p.x, p.y);
+    //  }
+    //}
+
     this.context.putImageData(imageData, 0, 0);
   }
 
@@ -953,6 +971,11 @@ export class HomeComponent implements OnInit {
     if (val.length > 16) {
       (event.target as HTMLInputElement).value = this.username;
       alert("Username cannot be longer than 16 characters.");
+      return;
+    }
+    else if (val.toLowerCase().includes("[deleted]")) {
+      (event.target as HTMLInputElement).value = this.username;
+      alert("'[deleted]' is not an allowed username.");
       return;
     }
     this.username = val;

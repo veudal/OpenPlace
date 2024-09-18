@@ -45,7 +45,7 @@
           },
           "configurations": {
             "production": {
-              "baseHref": "https://veudal.github.io/openplace/",
+              "baseHref": "/openplace/",
               "budgets": [
                 {
                   "type": "initial",
