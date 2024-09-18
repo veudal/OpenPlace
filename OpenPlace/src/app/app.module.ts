@@ -9,17 +9,13 @@ import { HomeComponent } from './home/home.component';
 
 @NgModule({
   declarations: [
-    AppComponent,
+    AppComponent
   ],
   imports: [
     BrowserModule,
-    AppRoutingModule,
-    NgxSliderModule
+    AppRoutingModule
   ],
-
-  providers: [
-    provideAnimationsAsync(),
-  ],
+  providers: [],
   bootstrap: [AppComponent]
 })
 
