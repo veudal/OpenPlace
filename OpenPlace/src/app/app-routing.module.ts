@@ -5,12 +5,12 @@ import { PrivacyPolicyComponent } from './privacy-policy/privacy-policy.componen
 import { LocationStrategy, HashLocationStrategy } from '@angular/common';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent},
+  { path: '', component: HomeComponent },
   { path: 'privacy-policy', component: PrivacyPolicyComponent },
   { path: '**', redirectTo: '' }
 ];
 
-@NgModule({
+@NgModule({ 
   imports: [RouterModule.forRoot(routes)],
   exports: [RouterModule],
 })
