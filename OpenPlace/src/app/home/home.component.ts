@@ -9,7 +9,7 @@ import { SignalRService } from '../services/signalr.service';
 import { ViewSettings } from '../interfaces/ViewSettings.interface';
 import { HubConnectionState } from '@microsoft/signalr';
 import Panzoom, { PanzoomObject } from '@panzoom/panzoom';
-import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Params, QueryParamsHandling, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { NgxSliderModule } from '@angular-slider/ngx-slider';
 import moment from 'moment';
@@ -52,6 +52,7 @@ export class HomeComponent implements OnInit {
   selectedColor: number = 0;
 
   debounceTimeout: any = null;
+  panzoomRouting = false;
 
   sliderValue = 0;
   sliderDragState = false;
@@ -122,7 +123,6 @@ export class HomeComponent implements OnInit {
   }
 
   private initPanzoom() {
-    this.updateZoompanFromParams();
     this.panzoom = Panzoom(this.canvas, {
       contain: 'outside',
       cursor: 'pointer',
@@ -131,6 +131,7 @@ export class HomeComponent implements OnInit {
       maxScale: Math.min(this.dimensions.width, this.dimensions.height) / 10
     });
     this.restorePanzoomState();
+    this.route.queryParams.subscribe((params) => this.updateZoompanFromParams(params))
   }
 
   private initColorPicker() {
@@ -186,23 +187,6 @@ export class HomeComponent implements OnInit {
     this.resizeCanvas();
 
     await this.loadBoard();
-  }
-
-  private updateZoompanFromParams() {
-    let { x, y, scale } = this.route.snapshot.queryParams;
-
-    if (x && y && scale) {
-      localStorage.setItem('panzoomState', JSON.stringify({ x: x || 0, y: y || 0, scale: scale || 1 }));
-    }
-    else {
-      const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
-      ({ x, y, scale } = stored);
-    }
-
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { x: x, y: y, scale: scale },
-    });
   }
 
   private initCanvasEvents() {
@@ -275,14 +259,14 @@ export class HomeComponent implements OnInit {
     this.canvas.style.width = max + 'px';
     this.canvas.style.height = max + 'px';
 
-    const rect = this.canvas.getBoundingClientRect();
-    const parentRect = this.canvas.parentElement.getBoundingClientRect();
+    //const rect = this.canvas.getBoundingClientRect();
+    //const parentRect = this.canvas.parentElement.getBoundingClientRect();
 
-    const offsetX = rect.left - parentRect.left;
-    const offsetY = rect.top - parentRect.top;
+    //const offsetX = rect.left - parentRect.left;
+    //const offsetY = rect.top - parentRect.top;
 
-    this.grid.style.left = `${rect.left}px`;
-    this.grid.style.top = `${rect.top}px`;
+    //this.grid.style.left = `${rect.left}px`;
+    //this.grid.style.top = `${rect.top}px`;
 
     //this.grid.style.width = 100 + "px";
     //this.grid.style.height = 100+ "px";
@@ -307,8 +291,8 @@ export class HomeComponent implements OnInit {
   }
 
   private receivePixel(receivedPixel: any) {
-    if (receivedPixel.placedBy == "") {
-      receivedPixel.placedBy = this.defaultUsername;
+    if (receivedPixel.p == "") {
+      receivedPixel.p = this.defaultUsername;
     }
 
     this.boardArr.push(receivedPixel);
@@ -324,8 +308,8 @@ export class HomeComponent implements OnInit {
         ceil: this.boardArr.length
       };
     }
-    if (isLastPixel && !this.userFilter || this.userFilter == receivedPixel.placedBy) {
-      this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.color);
+    if (isLastPixel && !this.userFilter || this.userFilter == receivedPixel.p) {
+      this.drawPixel(receivedPixel.x, receivedPixel.y, receivedPixel.c);
     }
 
     this.updateLeaderboard();
@@ -718,7 +702,6 @@ export class HomeComponent implements OnInit {
 
     try {
       //do {
-
       const result = await this.fetchWithProgress(environment.endpointUrl + `/GetRange`);
       if (!result.ok) {
         alert("This site is currently under maintenance.");
@@ -987,8 +970,10 @@ export class HomeComponent implements OnInit {
       return;
     }
     this.panzoom.zoomWithWheel(e, { animate: true });
-    //this.updateGrid();
     this.savePanzoomState();
+
+    //this.updateGrid();
+
   }
 
   private updateGrid() {
@@ -1005,8 +990,6 @@ export class HomeComponent implements OnInit {
     const scaleX = canvasWidth / (this.dimensions.width * cellSize);
     const scaleY = canvasHeight / (this.dimensions.height * cellSize);
 
-
-
     // Apply scaling and translation
     this.grid.style.transform = `scale(${scaleX}, ${scaleY}) translate(${thickness}px, ${thickness}px)`;
   }
@@ -1018,13 +1001,20 @@ export class HomeComponent implements OnInit {
 
     const scale = Math.round(this.panzoom.getScale());
 
+    // If there are no changes then the operation should be canceled.
+    const map = this.route.snapshot.queryParamMap;
+    if (map.get('x') == x.toString() && map.get('y') == y.toString() && map.get('scale') == scale.toString()) {
+      return;
+    }
+
+    this.panzoomRouting = true;
+    localStorage.setItem('panzoomState', JSON.stringify({ x: x, y: y, scale }));
+
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { x: x, y: y, scale: scale },
       queryParamsHandling: 'merge'
     });
-
-    localStorage.setItem('panzoomState', JSON.stringify({ x: x, y: y, scale }));
   }
 
   private restorePanzoomState() {
@@ -1035,6 +1025,29 @@ export class HomeComponent implements OnInit {
     const state = JSON.parse(savedState);
     this.panzoom.zoom(state.scale);
     setTimeout(() => this.panzoom.pan(state.x, state.y))
+  }
+
+  private updateZoompanFromParams(params: Params) {
+    if (this.panzoomRouting) {
+      this.panzoomRouting = false;
+      return;
+    }
+
+    let { x, y, scale } = params;
+
+    if (x && y && scale) {
+      localStorage.setItem('panzoomState', JSON.stringify({ x: x || 0, y: y || 0, scale: scale || 1 }));
+    }
+    else {
+      const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
+      ({ x, y, scale } = stored);
+    }
+
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { x: x, y: y, scale: scale },
+    });
+    this.restorePanzoomState();
   }
 
   private getIndex(p: Pixel): number {

@@ -5,10 +5,10 @@
   <div>
     <div class="container">
       <div style="margin-right: 30px" class="color-picker"></div>
-      <div  style="margin-left: 4vw" class="div">
+      <div style="margin-left: 4vw" class="div">
         <div style="display: flex">
           <div>
-            <canvas style="flex: 1" class="canvas" id="canvas"></canvas>
+            <canvas class="canvas" id="canvas"></canvas>
             <div id="grid" class="grid"></div>
             <div [ngStyle]="{'background-image': 'url(assets/loading.jpg)'}" class="loading-overlay" id="loadingOverlay">
               <div>
@@ -28,8 +28,7 @@
         </div>
       </div>
       <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
-
-      <div style="height: 50%">
+      <div>
         <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
           <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>
           <input id="username"
