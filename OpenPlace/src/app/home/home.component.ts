@@ -56,16 +56,17 @@ export class HomeComponent implements OnInit {
 
   sliderValue = 0;
   sliderDragState = false;
-  isSliderVisible = false; //Has to be false until board has been loaded
+  isBoardLoaded = false;
+  sliderGradient = {
+    from: 'skyblue',
+    to: '#8048fa'
+  }
   sliderOptions = {
     ceil: 0,
     vertical: true,
     showSelectionBar: true,
     rightToLeft: true,
-    selectionBarGradient: {
-      from: 'skyblue',
-      to: '#8048fa'
-    },
+    selectionBarGradient: this.sliderGradient,
     getPointerColor: () => {
       return '#8048fa';
     },
@@ -78,11 +79,16 @@ export class HomeComponent implements OnInit {
       }
 
       const p = this.boardArr[Math.max(value - 1, 0)];
+      const maxLength = 8;
+      const shortenName = p.p!.length > maxLength;
+      if (shortenName) {
+        p.p = p.p?.substring(0, maxLength - 1)! + "..";
+      }
       return `
       <div style="text-align: center; color: #8048fa; font-size: 14px">
         <b># ${value} Pixel
         </b><br>${this.getLocalDate(p.t)}
-        </b><br>(${p.x} | ${p.y})
+        </b><br>(${p.x} | ${p.y}) @${p.p}
     </div>`;
     }
   };
@@ -100,7 +106,6 @@ export class HomeComponent implements OnInit {
     this.initUsername();
     this.initPanzoom();
     this.initCanvasEvents();
-    this.initWindowResizeEvent();
     this.initSignalR();
     this.initDocumentEvents();
     this.initPaletteContainer();
@@ -128,7 +133,8 @@ export class HomeComponent implements OnInit {
       cursor: 'pointer',
       step: 0.7,
       minScale: 1,
-      maxScale: Math.min(this.dimensions.width, this.dimensions.height) / 10
+      maxScale: Math.min(this.dimensions.width, this.dimensions.height) / 10,
+      touchAction: ""
     });
     this.restorePanzoomState();
     this.route.queryParams.subscribe((params) => this.updateZoompanFromParams(params))
@@ -183,14 +189,11 @@ export class HomeComponent implements OnInit {
     this.canvas.setAttribute('tabindex', '0');
 
     this.grid = document.getElementById('grid') as HTMLDivElement;
-
-    this.resizeCanvas();
-
     await this.loadBoard();
   }
 
   private initCanvasEvents() {
-    this.canvas.addEventListener('wheel', this.onWheel.bind(this));
+    this.canvas.addEventListener('wheel', (e: WheelEvent) => this.onWheel(e), { passive: false });
     this.canvas.addEventListener('keydown', (e: KeyboardEvent) => this.handleKeydown(e));
     this.canvas.addEventListener('pointerdown', (e: MouseEvent) => this.handleMouseDown(e));
     this.canvas.addEventListener('pointerup', (e: MouseEvent) => this.handleMouseUp(e));
@@ -248,30 +251,6 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  private initWindowResizeEvent() {
-    window.addEventListener('resize', () => {
-      this.resizeCanvas();
-    });
-  }
-
-  private resizeCanvas() {
-    const max = Math.min(window.innerWidth, window.innerHeight / 1.2);
-    this.canvas.style.width = max + 'px';
-    this.canvas.style.height = max + 'px';
-
-    //const rect = this.canvas.getBoundingClientRect();
-    //const parentRect = this.canvas.parentElement.getBoundingClientRect();
-
-    //const offsetX = rect.left - parentRect.left;
-    //const offsetY = rect.top - parentRect.top;
-
-    //this.grid.style.left = `${rect.left}px`;
-    //this.grid.style.top = `${rect.top}px`;
-
-    //this.grid.style.width = 100 + "px";
-    //this.grid.style.height = 100+ "px";
-  }
-
   private initSignalR() {
 
     this.signalRService.startConnection().subscribe(() => {
@@ -299,7 +278,7 @@ export class HomeComponent implements OnInit {
 
     const isLastPixel = this.sliderValue + 1 == this.boardArr.length;
 
-    if (this.isSliderVisible && isLastPixel && this.userFilter == null) {
+    if (this.isBoardLoaded && isLastPixel && this.userFilter == null) {
       this.setSliderToMax();
     }
     else {
@@ -333,9 +312,9 @@ export class HomeComponent implements OnInit {
   }
 
   private handleColorScrolling(e: WheelEvent) {
-    e.preventDefault()
     const id = (e.target as HTMLElement).id
     if (e.shiftKey || e.ctrlKey || e.altKey || id == "palette-container" || id.endsWith("-color")) {
+      e.preventDefault()
       if (e.deltaY > 0) {
         this.changeColorSelection("E");
       }
@@ -538,8 +517,17 @@ export class HomeComponent implements OnInit {
 
     this.setSliderToMax();
     this.sliderValue = this.sliderOptions.ceil; //Required because drawBoard will be exectued before setSliderToMax due to setTimeout otherwise slider would glitch
-
+    this.setSliderColor();
     this.resetUserFilter();
+  }
+
+  private setSliderColor() {
+    const alternativeGradient = { from: 'orange', to: 'red' };
+
+    this.sliderOptions = {
+      ...this.sliderOptions,
+      selectionBarGradient: this.sliderValue == this.boardArr.length ? this.sliderGradient : alternativeGradient
+    };
   }
 
   private setPixel(e: MouseEvent) {
@@ -585,7 +573,9 @@ export class HomeComponent implements OnInit {
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
     const pixel = this.findLatestPixel(x, y);
-
+    if (!isDevMode()) {
+      console.log(pixel);
+    }
     this.drawHoverPixel(x, y, pixel?.c, pixel?.p, false);
 
     if (pixel) {
@@ -612,7 +602,7 @@ export class HomeComponent implements OnInit {
 
   private findLatestPixel(x: number, y: number) {
     let max = this.boardArr.length;
-    if (this.isSliderVisible) {
+    if (this.isBoardLoaded) {
       max = this.sliderValue;
     }
     for (let i = max - 1; i >= 0; i--) {
@@ -707,10 +697,10 @@ export class HomeComponent implements OnInit {
         alert("This site is currently under maintenance.");
         return;
       }
-
-      pixels = await result.json();
-
-      this.boardArr = this.boardArr.concat(pixels); // In case for the possibility future pagination
+      const websocketPixels = this.boardArr;
+      this.boardArr = await result.json();
+      this.boardArr = this.boardArr.concat(websocketPixels);
+      // By prepending the board state, the websocket pixels are on the correct index of the board
       this.drawBoard();
       this.drawHoverPixel(this.hoverPixel.x, this.hoverPixel.y, this.hoverPixel.c, this.hoverPixel.p, true)
       this.updateLeaderboard();
@@ -726,7 +716,7 @@ export class HomeComponent implements OnInit {
       }
     }
     document.getElementById('loadingOverlay')!.style.display = 'none';
-    this.isSliderVisible = true;
+    this.isBoardLoaded = true;
     this.setSliderToMax();
   }
 
@@ -776,7 +766,7 @@ export class HomeComponent implements OnInit {
     this.leaderboard = [];
 
     let max = this.boardArr.length;
-    if (this.isSliderVisible) {
+    if (this.isBoardLoaded) {
       max = this.sliderValue;
     }
 
@@ -814,10 +804,11 @@ export class HomeComponent implements OnInit {
 
   }
 
-  public async onSliderChange() {
+  public onSliderChange() {
     clearTimeout(this.debounceTimeout);
 
     this.debounceTimeout = setTimeout(() => {
+      this.setSliderColor();
       this.drawBoard();
       this.updateLeaderboard();
     }, 1);
@@ -899,11 +890,11 @@ export class HomeComponent implements OnInit {
 
   private drawBoard() {
 
-    let pixelLimit = this.isSliderVisible ? this.sliderValue : this.boardArr.length;
+    let pixelLimit = this.isBoardLoaded ? this.sliderValue : this.boardArr.length;
     const imageData = this.context.createImageData(this.dimensions.width, this.dimensions.height);
     const data = imageData.data;
 
-    const setPixel = (hex: string, x: number, y: number) => {
+    const writePixelToData = (hex: string, x: number, y: number) => {
       const bigint = parseInt(hex, 16);
       const r = (bigint >> 16) & 255;
       const g = (bigint >> 8) & 255;
@@ -918,23 +909,9 @@ export class HomeComponent implements OnInit {
     for (let i = 0; i < pixelLimit; i++) {
       const p = this.boardArr[i];
       if (!this.userFilter || p.p == this.userFilter) {
-        setPixel(p.c, p.x, p.y);
+        writePixelToData(p.c, p.x, p.y);
       }
     }
-
-    // Alternative code, but currently 4x slower:
-    //const map = new Map();
-    //for (let i = pixelLimit - 1; i >= 0; i--) {
-    //  const p = this.boardArr[i];
-
-    //  if (map.has(`${p.x},${p.y}`)) {
-    //    continue;
-    //  }
-    //  if (!this.userFilter || p.p == this.userFilter) {
-    //    map.set(`${p.x},${p.y}`, undefined);
-    //    setPixel(p.c, p.x, p.y);
-    //  }
-    //}
 
     this.context.putImageData(imageData, 0, 0);
   }
@@ -966,6 +943,7 @@ export class HomeComponent implements OnInit {
   }
 
   private onWheel(e: WheelEvent) {
+    e.preventDefault()
     if (e.shiftKey || e.ctrlKey || e.altKey) {
       return;
     }

@@ -1,16 +1,23 @@
 .canvas {
-  display: block;
+  display: flex;
   background-color: white;
   image-rendering: pixelated;
   touch-action: manipulation;
   outline: none;
+  width: 40vw;
+  max-width: 40vw;
+  aspect-ratio: 1 / 1;
 }
 
 .div {
-    position: relative;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
 }
 
-#grid {
+.grid {
   --grid-strength: 0.1px;
   --grid-color: #c7c7c7;
   position: absolute;
@@ -48,24 +55,27 @@
 
 @media (max-width: 1399px) { /* Adjust for mobile or smaller screens */
   .container {
-    margin-top: 10vh;
+    margin-top: 5vh;
     display: block;
   }
 
   .div {
     margin-bottom: 3vh;
   }
+  .canvas {
+    min-width: 65vw;
+  }
 }
 
 .palette-container {
+  position: relative;
+  margin-top: 2.5vh;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(35px, 1fr));
   background-color: #223a70;
   border-radius: 20px;
   padding: 12px 10vw;
-  margin-top: 12px;
   gap: 10px;
-  justify-content: center;
 }
 
 
@@ -152,7 +162,7 @@
 }
 
 .dots {
-  margin-top: 12vh;
+  margin-top: 16vh;
   font-size: 100px;
   color: white;
   display: flex;
@@ -164,7 +174,7 @@
 }
 
 .progress {
-  margin-top: 8vh;
+  margin-top: 4vh;
   color: white;
   font-size: 16px;
   text-align: center;

@@ -23,7 +23,7 @@
             </div>
           </div>
           <div style="flex: 1;">
-            <ngx-slider style="margin-left: 3vw" *ngIf="isSliderVisible" id="slider" [(value)]="sliderValue" [options]="sliderOptions" (userChange)="onSliderChange()" (userChangeStart)="onSliderStart()" (userChangeEnd)="onSliderEnd()"></ngx-slider>
+            <ngx-slider style="margin-left: 3vw" *ngIf="isBoardLoaded" id="slider" [(value)]="sliderValue" [options]="sliderOptions" (userChange)="onSliderChange()" (userChangeStart)="onSliderStart()" (userChangeEnd)="onSliderEnd()"></ngx-slider>
           </div>
         </div>
       </div>
