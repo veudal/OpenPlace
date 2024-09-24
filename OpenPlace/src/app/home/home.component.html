@@ -4,6 +4,15 @@
 <body class="min-h-screen body p-2">
   <div>
     <div class="container">
+      <div id="chat-container">
+        <div id="chat-window">
+          <div class="disable-selection" id="chat-header">Public Chat-Room</div>
+          <div id="chat-messages"></div>
+          <input type="text" id="chat-input" (keydown)="chatInputKeydown($event)" placeholder="Type a message..." />
+          <button id="send-btn" (click)="sendChatMessage()">Send</button>
+        </div>
+        <button (click)="chatArrowClick()" class="disable-selection" id="chat-arrow">&#9664;</button>
+      </div>
       <div style="margin-right: 30px" class="color-picker"></div>
       <div style="margin-left: 4vw" class="div">
         <div style="display: flex">

@@ -254,19 +254,83 @@ export class HomeComponent implements OnInit {
   private initSignalR() {
 
     this.signalRService.startConnection().subscribe(() => {
-      this.signalRService.receiveMessage().subscribe((message: any) => {
+      this.signalRService.receivePixel().subscribe((p: any) => {
+        const pixel = JSON.parse(p);
+        this.receivePixel(pixel);
+      });
 
-        const obj = JSON.parse(message);
-        if (obj.type == "Broadcast") {
-          if (obj.username.toLowerCase() == this.username.toLowerCase()) {
-            alert("Admin: " + obj.info)
-          }
-        }
-        else {
-          this.receivePixel(obj);
+      this.signalRService.receiveMessage().subscribe(([username, message]) => {
+        this.receiveChatMessage(username, message);
+      });
+
+      this.signalRService.receiveBroadcast().subscribe(([username, info]) => {
+        if (username.toLowerCase() == this.username.toLowerCase()) {
+          alert("Admin: " + info)
         }
       });
     });
+  }
+
+  private receiveChatMessage(username: string, message: string) {
+
+
+
+    const container = document.getElementById("chat-messages")!;
+
+    const messageElement = document.createElement("div");
+    const usernameSpan = document.createElement("span");
+    const messageSpan = document.createElement("span");
+
+    usernameSpan.textContent = username + ": ";
+    usernameSpan.style.fontWeight = "700";
+    usernameSpan.style.color = this.getUsernameColor(username)
+    messageSpan.textContent = message;
+
+    messageElement.appendChild(usernameSpan);
+    messageElement.appendChild(messageSpan);
+
+    messageElement.style.fontSize = "18px";
+    messageElement.style.padding = "5px";
+    messageElement.style.margin = "5px 0";
+    messageElement.style.backgroundColor = "#f1f1f1";
+    messageElement.style.borderRadius = "5px";
+
+    container.appendChild(messageElement);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  public chatInputKeydown(event: KeyboardEvent) {
+    if (event.key == 'Enter') {
+      this.sendChatMessage();
+    }
+  }
+
+  public chatArrowClick() {
+    const div = document.getElementById("chat-container") as HTMLDivElement;
+    div.classList.toggle("hidden");
+  }
+
+  private getUsernameColor(username: string) {
+    const colors = ["#DC143C", "#4169E1", "#3CB371", "#DAA520", "#6A5ACD", "#FF6347", "#FF8C00",
+      "#9370DB", "#008080", "#4682B4", "#9932CC", "#FF7F50", "#228B22", "#FF1493", "#708090"];
+
+    let number = 0;
+    for (var i = 0; i < username.length; i++) {
+      number += username.charCodeAt(i);
+    }
+    return colors[number % colors.length];
+  }
+
+  public async sendChatMessage() {
+    const message = document.getElementById("chat-input") as HTMLInputElement;
+    fetch(environment.endpointUrl + "/Message", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username: this.username, message: message.value })
+    })
+    message.value = "";
   }
 
   private receivePixel(receivedPixel: any) {
@@ -692,7 +756,7 @@ export class HomeComponent implements OnInit {
 
     try {
       //do {
-      const result = await this.fetchWithProgress(environment.endpointUrl + `/GetRange`);
+      const result = await this.fetchWithProgress(environment.endpointUrl + `/Board`);
       if (!result.ok) {
         alert("This site is currently under maintenance.");
         return;
@@ -858,7 +922,7 @@ export class HomeComponent implements OnInit {
         t: new Date()
       };
 
-      const response = await fetch(environment.endpointUrl + "/SendPixel", {
+      const response = await fetch(environment.endpointUrl + "/Pixel", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

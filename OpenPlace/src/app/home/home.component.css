@@ -9,6 +9,101 @@
   aspect-ratio: 1 / 1;
 }
 
+#chat-container {
+  z-index: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  position: absolute;
+  top: 20vh;
+  background-color: white;
+  left: 10px;
+  display: flex;
+  align-items: stretch;
+  transition: all 0.3s ease;
+}
+
+#chat-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  background-color: white;
+  color: darkslateblue;
+  cursor: pointer;
+  transition: all 1s ease;
+  font-size: 24px;
+}
+
+#chat-window {
+  width: 300px;
+  height: 500px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 5px 5px 0 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
+#chat-header {
+  background-color: darkslateblue;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+#chat-messages {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  background-color: #f1f1f1;
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+}
+
+#chat-input {
+  border: none;
+  padding: 0px;
+  flex-grow: 0.2;
+  outline: none;
+  font-weight: 500;
+  font-size: 18px;
+}
+
+#send-btn {
+  background-color: #007bff;
+  margin-bottom: 5px;
+  margin-right: 10px;
+  color: white;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  outline: none;
+  width: 80px;
+  border-radius: 4px;
+  align-self: end;
+  transition: ease 0.2s;
+}
+
+  #send-btn:hover {
+    background-color: #0056b3;
+  }
+
+#chat-container.hidden {
+  transform: translateX(-95%);
+}
+
+  #chat-container.hidden #chat-arrow {
+    transform: scaleX(-1);
+  }
+
 .div {
   position: relative;
   display: flex;
@@ -53,6 +148,13 @@
   }
 }
 
+.disable-selection {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
 @media (max-width: 1399px) { /* Adjust for mobile or smaller screens */
   .container {
     margin-top: 5vh;
@@ -62,6 +164,7 @@
   .div {
     margin-bottom: 3vh;
   }
+
   .canvas {
     min-width: 65vw;
   }
@@ -186,13 +289,13 @@
   text-align: center;
 }
 
-  .dot:nth-child(2) {
-    animation-delay: 0.2s;
-  }
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
 
-  .dot:nth-child(3) {
-    animation-delay: 0.4s;
-  }
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 @keyframes blink {
   0%, 20% {
@@ -206,4 +309,4 @@
   100% {
     opacity: 0.2;
   }
-} 
+}

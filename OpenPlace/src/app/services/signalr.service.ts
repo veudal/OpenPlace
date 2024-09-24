@@ -38,10 +38,26 @@ export class SignalRService {
     return this.hubConnection.state;
   }
 
-  receiveMessage(): Observable<string> {
+  receivePixel(): Observable<string> {
     return new Observable<string>((observer) => {
-      this.hubConnection.on('RM', (message: string) => {
-        observer.next(message);
+      this.hubConnection.on('Board', (p: string) => {
+        observer.next(p);
+      });
+    });
+  }
+
+  receiveBroadcast(): Observable<[string, string]> {
+    return new Observable<[string, string]>((observer) => {
+      this.hubConnection.on('Broadcast', (username: string, info: string) => {
+        observer.next([username, info]);
+      });
+    });
+  }
+
+  receiveMessage(): Observable<[string, string]> {
+    return new Observable<[string, string]>((observer) => {
+      this.hubConnection.on('Chat', (username: string, message: string) => {
+        observer.next([username, message]);
       });
     });
   }
