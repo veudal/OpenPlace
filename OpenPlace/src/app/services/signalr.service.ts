@@ -46,6 +46,14 @@ export class SignalRService {
     });
   }
 
+  receiveUserCount(): Observable<number> {
+    return new Observable<number>((observer) => {
+      this.hubConnection.on('UserCount', (count: number) => {
+        observer.next(count);
+      });
+    });
+  }
+
   receiveBroadcast(): Observable<[string, string]> {
     return new Observable<[string, string]>((observer) => {
       this.hubConnection.on('Broadcast', (username: string, info: string) => {
