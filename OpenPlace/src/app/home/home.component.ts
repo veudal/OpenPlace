@@ -33,6 +33,8 @@ export class HomeComponent implements OnInit {
   defaultColor: string = "FFFFFF";
   defaultUsername: string = "Anonymous";
   username: string = this.defaultUsername;
+  id: string = "";
+  takenColors: string[] = []
   mentionCount = 0;
 
   timeoutId: number | null = null;
@@ -105,7 +107,7 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.initCanvas();
-    this.initUsername();
+    this.initUsernameAndID();
     this.initPanzoom();
     this.initCanvasEvents();
     this.initSignalR();
@@ -122,10 +124,20 @@ export class HomeComponent implements OnInit {
     moment.locale(userLocale);
   }
 
-  private initUsername() {
+  private initUsernameAndID() {
     const storedUsername = localStorage.getItem("username");
     if (storedUsername) {
       this.username = storedUsername;
+    }
+
+    const storedID = localStorage.getItem("id");
+    if (storedID) {
+      this.id = storedID;
+    }
+    else {
+      const uniqueString = Math.random().toString(36).substring(2, 9);
+      localStorage.setItem("id", uniqueString);
+      this.id = uniqueString;
     }
   }
 
@@ -268,8 +280,8 @@ export class HomeComponent implements OnInit {
         this.receivePixel(pixel);
       });
 
-      this.signalRService.receiveMessage().subscribe(([username, message]) => {
-        this.receiveChatMessage(username, message);
+      this.signalRService.receiveMessage().subscribe(([id, username, message]) => {
+        this.receiveChatMessage(id, username, message);
       });
 
       this.signalRService.receiveBroadcast().subscribe(([username, info]) => {
@@ -294,7 +306,7 @@ export class HomeComponent implements OnInit {
     return [...str.matchAll(regex)].map(match => match.index);
   }
 
-  private receiveChatMessage(username: string, message: string) {
+  private receiveChatMessage(id: string, username: string, message: string) {
     const container = document.getElementById("chat-messages")!;
     const messageElement = document.createElement("div");
     const timeSpan = document.createElement("span");
@@ -307,7 +319,7 @@ export class HomeComponent implements OnInit {
 
     usernameSpan.textContent = username + ": ";
     usernameSpan.style.fontWeight = "700";
-    usernameSpan.style.color = this.getUsernameColor(username);
+    usernameSpan.style.color = this.getUsernameColor(id);
 
     // Find and style mention in the message
     const pingRegex = /(?<!\S)@([a-zA-Z0-9]+)(?![a-zA-Z0-9])/g;
@@ -351,33 +363,44 @@ export class HomeComponent implements OnInit {
     div.classList.toggle("hidden");
   }
 
-  private getUsernameColor(username: string) {
+  private getUsernameColor(id: string) {
     const colors = ["#DC143C", "#4169E1", "#3CB371", "#DAA520", "#6A5ACD", "#FF6347", "#FF8C00",
       "#9370DB", "#008080", "#4682B4", "#9932CC", "#FF7F50", "#228B22", "#FF1493", "#708090"];
 
-    let number = 0;
-    for (var i = 0; i < username.length; i++) {
-      number += username.charCodeAt(i);
+    if (this.takenColors.length == colors.length) {
+      this.takenColors.shift();
     }
-    return colors[number % colors.length];
+    const allowedColors = colors.filter(item => !this.takenColors.includes(item));
+
+    let sum = 0;
+    for (var i = 0; i < id.length; i++) {
+      sum += id.charCodeAt(i);
+    }
+
+    const color = allowedColors[sum % allowedColors.length];
+    this.takenColors.push(color);
+    return color;
   }
 
   public async sendChatMessage() {
     const message = document.getElementById("chat-input") as HTMLInputElement;
+    const input = message.value;
+    message.value = "";
+
     const result = await fetch(environment.endpointUrl + "/Message", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username: this.username, message: message.value })
+      body: JSON.stringify({ username: this.username, message: input, id: this.id })
     });
-    if (result.ok) {
-      message.value = "";
-    }
-    else if (result.status === 429) {
+
+    if (result.status === 429) {
+      message.value = input;
       alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`)
     }
-    else {
+    else if (!result.ok) {
+      message.value = input;
       const response = await result.text();
       alert(response);
     }

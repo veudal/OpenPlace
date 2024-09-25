@@ -62,10 +62,10 @@ export class SignalRService {
     });
   }
 
-  receiveMessage(): Observable<[string, string]> {
-    return new Observable<[string, string]>((observer) => {
-      this.hubConnection.on('Chat', (username: string, message: string) => {
-        observer.next([username, message]);
+  receiveMessage(): Observable<[string, string, string]> {
+    return new Observable<[string, string, string]>((observer) => {
+      this.hubConnection.on('Chat', (id: string, username: string, message: string) => {
+        observer.next([id, username, message]);
       });
     });
   }
