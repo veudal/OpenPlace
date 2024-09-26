@@ -97,7 +97,6 @@ export class HomeComponent implements OnInit {
   };
 
   grid: any;
-
   canvas: any;
   context: any;
 
