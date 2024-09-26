@@ -326,10 +326,15 @@ export class HomeComponent implements OnInit {
     const formattedMessage = message.replace(pingRegex, (match) => {
       const gotMentioned = match.substring(1) == this.username;
       if (gotMentioned) {
+        messageElement.style.backgroundColor = "#FFDDDB"
         audio.play();
-        this.mentionCount++;
-        const plural = this.mentionCount - 1 ? "s" : "";
-        document.title = `Open Place (${this.mentionCount} mention${plural})`;
+
+        const targetDiv = document.getElementById('chat-container');
+        if (targetDiv != document.activeElement && !targetDiv?.contains(document.activeElement)){
+          this.mentionCount++;
+          const plural = this.mentionCount - 1 ? "s" : "";
+          document.title = `Open Place (${this.mentionCount} mention${plural})`;
+        }
       }
       const color = gotMentioned ? "red" : "blue";
       return `<span style="font-weight: 600; color: ${color}">${match}</span>`;
@@ -342,7 +347,6 @@ export class HomeComponent implements OnInit {
     messageElement.style.fontSize = "18px";
     messageElement.style.padding = "5px";
     messageElement.style.margin = "5px 0";
-    messageElement.style.backgroundColor = "#f1f1f1";
     messageElement.style.borderRadius = "5px";
 
     // Append the message element to the container and scroll to the bottom
@@ -391,6 +395,11 @@ export class HomeComponent implements OnInit {
   public async sendChatMessage() {
     const message = document.getElementById("chat-input") as HTMLInputElement;
     const input = message.value;
+
+    //Check for empty input
+    if (!input.trim()) {
+      return;
+    }
     message.value = "";
 
     const result = await fetch(environment.endpointUrl + "/Message", {
@@ -403,13 +412,21 @@ export class HomeComponent implements OnInit {
 
     if (result.status === 429) {
       message.value = input;
-      alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`)
+      this.waitForNextFrame().then(() => alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`));
     }
     else if (!result.ok) {
-      message.value = input;
+     message.value = input;
       const response = await result.text();
-      alert(response);
+
+      //Check for empty input
+      if (!input.trim()) {
+        this.waitForNextFrame().then(() => alert(response));
+      }
     }
+  }
+
+  private waitForNextFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }
 
   private receivePixel(receivedPixel: any) {
