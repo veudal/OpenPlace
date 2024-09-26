@@ -38,7 +38,6 @@ export class HomeComponent implements OnInit {
   mentionCount = 0;
 
   timeoutId: number | null = null;
-
   audio: HTMLAudioElement = new Audio("assets/sfx/place.mp3");
   pickr: Pickr | null = null;
 
