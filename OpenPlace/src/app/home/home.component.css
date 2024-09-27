@@ -160,13 +160,6 @@
   }
 }
 
-.disable-selection {
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-}
-
 @media (max-width: 1399px) { /* Adjust for mobile or smaller screens */
   .container {
     margin-top: 5vh;

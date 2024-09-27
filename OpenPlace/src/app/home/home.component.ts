@@ -321,16 +321,19 @@ export class HomeComponent implements OnInit {
     const date = new Date();
     timeSpan.textContent = date.getHours().toString().padStart(2, "0") + ":" + date.getMinutes().toString().padStart(2, "0") + " - ";
     timeSpan.style.color = "gray";
+    timeSpan.classList.add('disable-selection');
 
     usernameSpan.textContent = username + ": ";
     usernameSpan.style.fontWeight = "700";
     usernameSpan.style.color = this.getUsernameColor(id);
     usernameSpan.style.cursor = "pointer";
+    usernameSpan.classList.add('disable-selection');
 
     usernameSpan.addEventListener("pointerdown", () => {
       const message = document.getElementById("chat-input") as HTMLInputElement;
       const prefix = message.value.length == 0 ? "@" : " @";
       message.value += prefix + username;
+      this.charCount = message.value.length;
     });
 
 
@@ -440,7 +443,7 @@ export class HomeComponent implements OnInit {
   //    sel.addRange(newRange);
   //  }
   //}
- 
+
   public chatInputKeydown(event: KeyboardEvent) {
     if (event.key == 'Enter') {
       event.preventDefault(); //Do not allow multiple lines
