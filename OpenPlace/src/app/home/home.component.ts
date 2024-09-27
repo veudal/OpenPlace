@@ -51,6 +51,8 @@ export class HomeComponent implements OnInit {
   progress: string = "0.00 MB fetched...";
   pixelEstimate: string = "(0 pixels)";
   userCount = 0;
+  charCount = 0;
+  maximumChars = 128;
 
   selectedColor: number = 0;
 
@@ -304,6 +306,11 @@ export class HomeComponent implements OnInit {
     return [...str.matchAll(regex)].map(match => match.index);
   }
 
+  public chatInputChange(event: Event) {
+    const inputElement = event.target as HTMLTextAreaElement;
+    this.charCount = inputElement.value.length;
+  }
+
   private receiveChatMessage(id: string, username: string, message: string) {
     const container = document.getElementById("chat-messages")!;
     const messageElement = document.createElement("div");
@@ -312,12 +319,20 @@ export class HomeComponent implements OnInit {
     const messageSpan = document.createElement("span");
 
     const date = new Date();
-    timeSpan.textContent = date.getHours() + ":" + date.getMinutes() + " - ";
+    timeSpan.textContent = date.getHours().toString().padStart(2, "0") + ":" + date.getMinutes().toString().padStart(2, "0") + " - ";
     timeSpan.style.color = "gray";
 
     usernameSpan.textContent = username + ": ";
     usernameSpan.style.fontWeight = "700";
     usernameSpan.style.color = this.getUsernameColor(id);
+    usernameSpan.style.cursor = "pointer";
+
+    usernameSpan.addEventListener("pointerdown", () => {
+      const message = document.getElementById("chat-input") as HTMLInputElement;
+      const prefix = message.value.length == 0 ? "@" : " @";
+      message.value += prefix + username;
+    });
+
 
     // Find and style mention in the message
     const pingRegex = /(?<!\S)@([a-zA-Z0-9]+)(?![a-zA-Z0-9])/g;
@@ -330,7 +345,7 @@ export class HomeComponent implements OnInit {
         audio.play();
 
         const targetDiv = document.getElementById('chat-container');
-        if (targetDiv != document.activeElement && !targetDiv?.contains(document.activeElement)){
+        if (targetDiv != document.activeElement && !targetDiv?.contains(document.activeElement)) {
           this.mentionCount++;
           const plural = this.mentionCount - 1 ? "s" : "";
           document.title = `Open Place (${this.mentionCount} mention${plural})`;
@@ -354,8 +369,81 @@ export class HomeComponent implements OnInit {
     container.scrollTop = container.scrollHeight;
   }
 
+
+  //private highlightMentions(element: HTMLElement): void {
+  //  const pingRegex = /(?<!\S)@([a-zA-Z0-9]+)/g;
+
+  //  // Save the current selection and cursor position
+  //  const sel = window.getSelection();
+  //  const range = sel!.rangeCount > 0 ? sel!.getRangeAt(0) : null;
+  //  const currentOffset = range ? range.startOffset : 0;
+
+  //  // Create a temporary div to hold the formatted content
+  //  const tempDiv = document.createElement('div');
+  //  let lastIndex = 0;
+  //  let match: RegExpExecArray | null;
+
+  //  // Replace mentions while preserving other text
+  //  while ((match = pingRegex.exec(element.innerText)) !== null) {
+  //    // Append text before the mention
+  //    tempDiv.appendChild(document.createTextNode(element.innerText.substring(lastIndex, match.index)));
+
+  //    // Create a span for the mention
+  //    const mentionSpan = document.createElement('span');
+  //    mentionSpan.style.fontWeight = '600';
+  //    mentionSpan.style.color = 'blue';
+  //    mentionSpan.textContent = match[0]; // Use the matched mention
+  //    tempDiv.appendChild(mentionSpan);
+
+  //    lastIndex = match.index + match[0].length;
+  //  }
+
+  //  // Append any remaining text after the last mention
+  //  tempDiv.appendChild(document.createTextNode(element.innerText.substring(lastIndex)));
+
+  //  // Clear the original element and append the new content
+  //  element.innerHTML = ''; // Clear using innerHTML for better performance
+  //  element.appendChild(tempDiv);
+
+  //  // Restore the cursor position
+  //  if (sel && range) {
+  //    const newRange = document.createRange();
+  //    let adjustedOffset = currentOffset;
+
+  //    // Find the new cursor position
+  //    tempDiv.childNodes.forEach((child) => {
+  //      if (child.nodeType === Node.TEXT_NODE) {
+  //        if (adjustedOffset <= child.textContent!.length) {
+  //          newRange.setStart(child, adjustedOffset);
+  //          newRange.collapse(true);
+  //          return; // Exit the forEach loop early
+  //        }
+  //        adjustedOffset -= child.textContent!.length;
+  //      } else if (child.nodeType === Node.ELEMENT_NODE) {
+  //        const spanLength = child.textContent!.length;
+  //        if (adjustedOffset <= spanLength) {
+  //          newRange.setStartAfter(child);
+  //          newRange.collapse(true);
+  //          return; // Exit the forEach loop early
+  //        }
+  //        adjustedOffset -= spanLength;
+  //      }
+  //    });
+
+  //    // Adjust the range to the appropriate position if needed
+  //    if (adjustedOffset > 0) {
+  //      newRange.setStart(tempDiv, tempDiv.childNodes.length); // Set to the end if out of bounds
+  //    }
+
+  //    // Restore the selection
+  //    sel.removeAllRanges();
+  //    sel.addRange(newRange);
+  //  }
+  //}
+ 
   public chatInputKeydown(event: KeyboardEvent) {
     if (event.key == 'Enter') {
+      event.preventDefault(); //Do not allow multiple lines
       this.sendChatMessage();
     }
   }
@@ -393,6 +481,7 @@ export class HomeComponent implements OnInit {
   }
 
   public async sendChatMessage() {
+
     const message = document.getElementById("chat-input") as HTMLInputElement;
     const input = message.value;
 
@@ -400,7 +489,11 @@ export class HomeComponent implements OnInit {
     if (!input.trim()) {
       return;
     }
+    else if (input.length > this.maximumChars) {
+      return;
+    }
     message.value = "";
+    this.charCount = 0;
 
     const result = await fetch(environment.endpointUrl + "/Message", {
       method: 'POST',
@@ -412,17 +505,22 @@ export class HomeComponent implements OnInit {
 
     if (result.status === 429) {
       message.value = input;
+      this.charCount = input.length;
+
       this.waitForNextFrame().then(() => alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`));
     }
     else if (!result.ok) {
-     message.value = input;
+      message.value = input;
+      this.charCount = input.length;
+
       const response = await result.text();
 
-      //Check for empty input
-      if (!input.trim()) {
+      //Check for empty response
+      if (response.trim()) {
         this.waitForNextFrame().then(() => alert(response));
       }
     }
+
   }
 
   private waitForNextFrame() {

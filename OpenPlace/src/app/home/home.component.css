@@ -68,11 +68,23 @@
 
 #chat-input {
   border: none;
-  padding: 0px 10px 0px 10px;
-  flex-grow: 0.2;
+  padding: 10px 10px 0px 10px;
+  flex-grow: 0.1;
   outline: none;
   font-weight: 500;
-  font-size: 18px;
+  font-size: 20px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.1;
+  resize: none;
+}
+
+.char-count {
+  font-size: 16px;
+  padding: 8px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
 }
 
 #send-btn {

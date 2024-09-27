@@ -14,8 +14,9 @@
             </div>
           </div>
           <div id="chat-messages"></div>
-          <input type="text" autocomplete="off" id="chat-input" (keydown)="chatInputKeydown($event)" placeholder="Type a message..." />
+          <textarea type="text" spellcheck="false" id="chat-input" (input)=chatInputChange($event) (keydown)="chatInputKeydown($event)" placeholder="Mention users with @"></textarea>
           <button id="send-btn" (click)="sendChatMessage()">Send</button>
+          <div class="char-count" [ngStyle]="charCount > maximumChars ? { 'color': 'red', 'font-weight': '900' } : { 'color': 'gray', 'font-weight': 'normal' }">{{charCount}}/{{maximumChars}}</div>
         </div>
         <button (click)="chatArrowClick()" class="disable-selection" id="chat-arrow">&#9664;</button>
       </div>
