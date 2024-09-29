@@ -21,10 +21,12 @@ https://github.com/user-attachments/assets/7572b5cd-b8eb-48a8-9dd8-fb09685679e2
 - Use your scroll wheel on the canvas in order to zoom in or out on a certain point.
 - Use WASD (or the arrow keys) in order to move/navigate through the canvas. NOTE: Moving only works when the zoom level is greater than 1.
 - Press Q & E to either select the previous or next color in the palette.
-- Scroll the mousewheel while over the color palette or globally by holding either the CTRL, SHIFT or ALT key to scroll through the colors
+- Scroll the mousewheel while over the color palette or globally by holding either the CTRL, SHIFT or ALT key to scroll through the colors.
 - Press - & + to either zoom in or out on the current center.
-- Press SPACE to select the first color (your custom color)
+- Press SPACE to select the first color (your custom color).
 - Pan (move around) on the canvas by holding right click and the moving the mouse.
+- Use @ to mention someone in the chat. This will highlight the message for them, update their tab title accordingly and also make a sound to notify them.
+- Click on a username in the chat to automatically add a mention in the chat input box.
 
   ### Additional info
   - The stored username of placed pixels will not be changed with a new username.
@@ -42,13 +44,15 @@ Before creating anything, please read our [canvas guidelines](https://github.com
 
 # Features
 
-- Usernames
+- Slider to see every pixel change from the beginning
+- Chat with other users
+- Realtime updates from other users
+- - Usernames
 - Canvas zoom
 - Keyboard shortcuts for zoom (- & +)
 - Automatic zoom and position recovery on opening
 - Canvas movement (WASD or arrow keys)
 - Canvas panning
-- Realtime updates from other users
 - User filter for top 10 users (by pixels placed)
 - Leaderboard
 - Pixel hover info (coordinates, username, timestamp)
@@ -57,4 +61,3 @@ Before creating anything, please read our [canvas guidelines](https://github.com
 - 34 preset colors and one custom color
 - Color picker
 - Color palette navigation shortcuts (Q & E, mousewheel, space)
-- History mode (slider)
