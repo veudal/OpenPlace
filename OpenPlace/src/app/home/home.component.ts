@@ -52,7 +52,8 @@ export class HomeComponent implements OnInit {
   pixelEstimate: string = "(0 pixels)";
   userCount = 0;
   charCount = 0;
-  maximumChars = 128;
+  maxMessageLength = 0;
+  maxUsernameLength = 0;
 
   selectedColor: number = 0;
 
@@ -106,6 +107,7 @@ export class HomeComponent implements OnInit {
   constructor(private signalRService: SignalRService, private router: Router, private route: ActivatedRoute) { }
 
   ngOnInit() {
+    this.initConfiguration();
     this.initCanvas();
     this.initUsernameAndID();
     this.initPanzoom();
@@ -115,6 +117,25 @@ export class HomeComponent implements OnInit {
     this.initPaletteContainer();
     this.initColorPicker();
     this.initLocale();
+  }
+
+  private initConfiguration() {
+    fetch(environment.endpointUrl + "/Configuration")
+      .then(response => response.json())
+      .then(data => {
+        this.userCount = data.onlineUsersCount + 1;
+        this.maxMessageLength = data.maxMessageLength;
+        this.maxUsernameLength = data.maxUsernameLength;
+
+        this.restoreLast20Messages(data.messages);
+      })
+  }
+
+  private restoreLast20Messages(messages: any) {
+    for (var i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      this.receiveChatMessage(message.timestamp, message.userId, message.username, message.message);
+    }
   }
 
   private initLocale() {
@@ -268,20 +289,13 @@ export class HomeComponent implements OnInit {
   private async initSignalR() {
 
     this.signalRService.startConnection().subscribe(() => {
-
-      fetch(environment.endpointUrl + "/UserCount")
-        .then(response => response.text())
-        .then(data => {
-          this.userCount = Number(data);
-        })
-
       this.signalRService.receivePixel().subscribe((p: any) => {
         const pixel = JSON.parse(p);
         this.receivePixel(pixel);
       });
 
-      this.signalRService.receiveMessage().subscribe(([id, username, message]) => {
-        this.receiveChatMessage(id, username, message);
+      this.signalRService.receiveMessage().subscribe(([timestamp, userId, username, message]) => {
+        this.receiveChatMessage(timestamp, userId, username, message);
       });
 
       this.signalRService.receiveBroadcast().subscribe(([username, info]) => {
@@ -311,21 +325,44 @@ export class HomeComponent implements OnInit {
     this.charCount = inputElement.value.length;
   }
 
-  private receiveChatMessage(id: string, username: string, message: string) {
+  private dateDiffInDays(a: Date, b: Date): number {
+    const date1 = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+    const date2 = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+
+    const timeDifference = Math.abs(date1.getTime() - date2.getTime());
+    const msPerDay = 24 * 60 * 60 * 1000;
+
+    return Math.ceil(timeDifference / msPerDay);
+  }
+
+  private receiveChatMessage(timestamp: Date, userId: string, username: string, message: string) {
     const container = document.getElementById("chat-messages")!;
     const messageElement = document.createElement("div");
     const timeSpan = document.createElement("span");
     const usernameSpan = document.createElement("span");
     const messageSpan = document.createElement("span");
 
-    const date = new Date();
-    timeSpan.textContent = date.getHours().toString().padStart(2, "0") + ":" + date.getMinutes().toString().padStart(2, "0") + " - ";
+    let content;
+    const date = new Date(timestamp);
+    const difference = this.dateDiffInDays(new Date(), date);
+
+    if (difference == 0) {
+      content = date.getHours().toString().padStart(2, "0") + ":" + date.getMinutes().toString().padStart(2, "0");
+    }
+    else if (difference == 1) {
+      content = "Yesterday";
+    }
+    else {
+      return;
+    }
+
+    timeSpan.textContent = content + " - ";
     timeSpan.style.color = "gray";
     timeSpan.classList.add('disable-selection');
 
     usernameSpan.textContent = username + ": ";
     usernameSpan.style.fontWeight = "700";
-    usernameSpan.style.color = this.getUsernameColor(id);
+    usernameSpan.style.color = this.getUsernameColor(userId);
     usernameSpan.style.cursor = "pointer";
     usernameSpan.classList.add('disable-selection');
 
@@ -345,7 +382,10 @@ export class HomeComponent implements OnInit {
       const gotMentioned = match.substring(1) == this.username;
       if (gotMentioned) {
         messageElement.style.backgroundColor = "#FFDDDB"
-        audio.play();
+
+        if (this.signalRService.getState() == "Connected") //Only play sound when message was received via hub, not from server message history
+          audio.play();
+
 
         const targetDiv = document.getElementById('chat-container');
         if (targetDiv != document.activeElement && !targetDiv?.contains(document.activeElement)) {
@@ -492,7 +532,7 @@ export class HomeComponent implements OnInit {
     if (!input.trim()) {
       return;
     }
-    else if (input.length > this.maximumChars) {
+    else if (input.length > this.maxMessageLength) {
       return;
     }
     message.value = "";
@@ -503,7 +543,7 @@ export class HomeComponent implements OnInit {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username: this.username, message: input, id: this.id })
+      body: JSON.stringify({ username: this.username, message: input, userId: this.id })
     });
 
     if (result.status === 429) {
@@ -591,10 +631,10 @@ export class HomeComponent implements OnInit {
       const pan = this.panzoom.getPan();
       const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
 
-      const tolerance = 1; //Adjustment may be needed
+      const tolerance = 0.01;
 
-      const xMatch = Math.abs(Math.round(pan.x) - stored.x) <= tolerance;
-      const yMatch = Math.abs(Math.round(pan.y) - stored.y) <= tolerance;
+      const xMatch = Math.abs(pan.x - stored.x) <= tolerance;
+      const yMatch = Math.abs(pan.y - stored.y) <= tolerance;
       if (xMatch && yMatch) {
         this.colorPicker(e);
       }
@@ -834,7 +874,7 @@ export class HomeComponent implements OnInit {
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
     const pixel = this.findLatestPixel(x, y);
-    if (!isDevMode()) {
+    if (e.shiftKey || e.altKey || e.ctrlKey) {
       console.log(pixel);
     }
     this.drawHoverPixel(x, y, pixel?.c, pixel?.p, false);
@@ -1189,7 +1229,7 @@ export class HomeComponent implements OnInit {
 
   public usernameChange(event: Event) {
     const val = (event.target as HTMLInputElement).value
-    if (val.length > 16) {
+    if (val.length > this.maxUsernameLength) {
       (event.target as HTMLInputElement).value = this.username;
       alert("Username cannot be longer than 16 characters.");
       return;
@@ -1235,10 +1275,10 @@ export class HomeComponent implements OnInit {
 
   private savePanzoomState() {
     const pan = this.panzoom.getPan();
-    const x = Math.round(pan.x);
-    const y = Math.round(pan.y);
+    const x = pan.x;
+    const y = pan.y;
 
-    const scale = Math.round(this.panzoom.getScale());
+    const scale = this.panzoom.getScale();
 
     // If there are no changes then the operation should be canceled.
     const map = this.route.snapshot.queryParamMap;
@@ -1251,7 +1291,7 @@ export class HomeComponent implements OnInit {
 
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { x: x, y: y, scale: scale },
+      queryParams: { x: Math.round(x), y: Math.round(y), scale: Math.round(scale) },
       queryParamsHandling: 'merge'
     });
   }
