@@ -48,6 +48,7 @@ export class HomeComponent implements OnInit {
   leaderboard: Leaderboard[] = [];
   progress: string = "0.00 MB fetched...";
   pixelEstimate: string = "(0 pixels)";
+  userCount = 0;
 
   selectedColor: number = 0;
 
@@ -79,16 +80,16 @@ export class HomeComponent implements OnInit {
       }
 
       const p = this.boardArr[Math.max(value - 1, 0)];
+
+      // Shorten name if nessecary
       const maxLength = 8;
-      const shortenName = p.p!.length > maxLength;
-      if (shortenName) {
-        p.p = p.p?.substring(0, maxLength - 1)! + "..";
-      }
+      const name = p.p && p.p.length > maxLength ? `${p.p.substring(0, maxLength - 1)}..` : p.p;
+
       return `
       <div style="text-align: center; color: #8048fa; font-size: 14px">
         <b># ${value} Pixel
         </b><br>${this.getLocalDate(p.t)}
-        </b><br>(${p.x} | ${p.y}) @${p.p}
+        </b><br>(${p.x} | ${p.y}) @${name}
     </div>`;
     }
   };
@@ -137,7 +138,7 @@ export class HomeComponent implements OnInit {
       touchAction: ""
     });
     this.restorePanzoomState();
-    this.route.queryParams.subscribe((params) => this.updateZoompanFromParams(params))
+    this.route.queryParams.subscribe((params) => this.updatePanZoomFromParams(params))
   }
 
   private initColorPicker() {
@@ -251,9 +252,16 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  private initSignalR() {
+  private async initSignalR() {
 
     this.signalRService.startConnection().subscribe(() => {
+
+      fetch(environment.endpointUrl + "/UserCount")
+        .then(response => response.text())
+        .then(data => {
+          this.userCount = Number(data);
+        })
+
       this.signalRService.receivePixel().subscribe((p: any) => {
         const pixel = JSON.parse(p);
         this.receivePixel(pixel);
@@ -268,14 +276,27 @@ export class HomeComponent implements OnInit {
           alert("Admin: " + info)
         }
       });
-    });
+
+      this.signalRService.receiveUserCount().subscribe((count: number) => {
+        this.userCount = count;
+      });
+    })
   }
 
+  private getAllIndices(str: string, substring: string) {
+  const regex = new RegExp('\\b' + substring, 'gi');
+  return [...str.matchAll(regex)].map(match => match.index);
+}
+
   private receiveChatMessage(username: string, message: string) {
-
-
-
     const container = document.getElementById("chat-messages")!;
+    const containsPing = new RegExp("\\b" + "@").test(message)
+    if (containsPing) {
+      const indices = this.getAllIndices(message, "@");
+      for (var i = 0; i < indices.length; i++) {
+
+      }
+    }
 
     const messageElement = document.createElement("div");
     const usernameSpan = document.createElement("span");
@@ -323,14 +344,23 @@ export class HomeComponent implements OnInit {
 
   public async sendChatMessage() {
     const message = document.getElementById("chat-input") as HTMLInputElement;
-    fetch(environment.endpointUrl + "/Message", {
+    const result = await fetch(environment.endpointUrl + "/Message", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ username: this.username, message: message.value })
-    })
-    message.value = "";
+    });
+    if (result.ok) {
+      message.value = "";
+    }
+    else if (result.status === 429) {
+      alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`)
+    }
+    else {
+      const response = await result.text();
+      alert(response);
+    }
   }
 
   private receivePixel(receivedPixel: any) {
@@ -1069,7 +1099,7 @@ export class HomeComponent implements OnInit {
     setTimeout(() => this.panzoom.pan(state.x, state.y))
   }
 
-  private updateZoompanFromParams(params: Params) {
+  private updatePanZoomFromParams(params: Params) {
     if (this.panzoomRouting) {
       this.panzoomRouting = false;
       return;

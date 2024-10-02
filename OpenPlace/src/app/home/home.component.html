@@ -6,9 +6,15 @@
     <div class="container">
       <div id="chat-container">
         <div id="chat-window">
-          <div class="disable-selection" id="chat-header">Public Chat-Room</div>
+          <div class="disable-selection" id="chat-header">
+            Public Chat
+            <div class="online-container">
+              <div class="online-count">{{userCount}} online</div>
+              <div class="online-dot"></div>
+            </div>
+          </div>
           <div id="chat-messages"></div>
-          <input type="text" id="chat-input" (keydown)="chatInputKeydown($event)" placeholder="Type a message..." />
+          <input type="text" autocomplete="off" id="chat-input" (keydown)="chatInputKeydown($event)" placeholder="Type a message..." />
           <button id="send-btn" (click)="sendChatMessage()">Send</button>
         </div>
         <button (click)="chatArrowClick()" class="disable-selection" id="chat-arrow">&#9664;</button>
