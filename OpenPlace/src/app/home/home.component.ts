@@ -33,9 +33,11 @@ export class HomeComponent implements OnInit {
   defaultColor: string = "FFFFFF";
   defaultUsername: string = "Anonymous";
   username: string = this.defaultUsername;
+  id: string = "";
+  takenColors: Map<string, string> = new Map();
+  mentionCount = 0;
 
   timeoutId: number | null = null;
-
   audio: HTMLAudioElement = new Audio("assets/sfx/place.mp3");
   pickr: Pickr | null = null;
 
@@ -49,6 +51,9 @@ export class HomeComponent implements OnInit {
   progress: string = "0.00 MB fetched...";
   pixelEstimate: string = "(0 pixels)";
   userCount = 0;
+  charCount = 0;
+  maxMessageLength = 0;
+  maxUsernameLength = 0;
 
   selectedColor: number = 0;
 
@@ -95,7 +100,6 @@ export class HomeComponent implements OnInit {
   };
 
   grid: any;
-
   canvas: any;
   context: any;
 
@@ -103,8 +107,9 @@ export class HomeComponent implements OnInit {
   constructor(private signalRService: SignalRService, private router: Router, private route: ActivatedRoute) { }
 
   ngOnInit() {
+    this.initConfiguration();
     this.initCanvas();
-    this.initUsername();
+    this.initUsernameAndID();
     this.initPanzoom();
     this.initCanvasEvents();
     this.initSignalR();
@@ -114,6 +119,25 @@ export class HomeComponent implements OnInit {
     this.initLocale();
   }
 
+  private initConfiguration() {
+    fetch(environment.endpointUrl + "/Config")
+      .then(response => response.json())
+      .then(data => {
+        this.userCount = data.onlineUsersCount + 1;
+        this.maxMessageLength = data.maxMessageLength;
+        this.maxUsernameLength = data.maxUsernameLength;
+
+        this.restoreLast20Messages(data.messages);
+      })
+  }
+
+  private restoreLast20Messages(messages: any) {
+    for (var i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      this.receiveChatMessage(message.timestamp, message.userId, message.username, message.message);
+    }
+  }
+
   private initLocale() {
     const userLocale = navigator.language
       ? navigator.languages[0]
@@ -121,10 +145,20 @@ export class HomeComponent implements OnInit {
     moment.locale(userLocale);
   }
 
-  private initUsername() {
+  private initUsernameAndID() {
     const storedUsername = localStorage.getItem("username");
     if (storedUsername) {
       this.username = storedUsername;
+    }
+
+    const storedID = localStorage.getItem("id");
+    if (storedID) {
+      this.id = storedID;
+    }
+    else {
+      const uniqueString = Math.random().toString(36).substring(2, 9);
+      localStorage.setItem("id", uniqueString);
+      this.id = uniqueString;
     }
   }
 
@@ -256,19 +290,13 @@ export class HomeComponent implements OnInit {
 
     this.signalRService.startConnection().subscribe(() => {
 
-      fetch(environment.endpointUrl + "/UserCount")
-        .then(response => response.text())
-        .then(data => {
-          this.userCount = Number(data);
-        })
-
       this.signalRService.receivePixel().subscribe((p: any) => {
         const pixel = JSON.parse(p);
         this.receivePixel(pixel);
       });
 
-      this.signalRService.receiveMessage().subscribe(([username, message]) => {
-        this.receiveChatMessage(username, message);
+      this.signalRService.receiveMessage().subscribe(([timestamp, userId, username, message]) => {
+        this.receiveChatMessage(timestamp, userId, username, message);
       });
 
       this.signalRService.receiveBroadcast().subscribe(([username, info]) => {
@@ -283,45 +311,183 @@ export class HomeComponent implements OnInit {
     })
   }
 
+  public onMouseOver() {
+    document.title = this.title;
+    this.mentionCount = 0;
+  }
+
   private getAllIndices(str: string, substring: string) {
-  const regex = new RegExp('\\b' + substring, 'gi');
-  return [...str.matchAll(regex)].map(match => match.index);
-}
+    const regex = new RegExp('\\b' + substring, 'gi');
+    return [...str.matchAll(regex)].map(match => match.index);
+  }
 
-  private receiveChatMessage(username: string, message: string) {
+  public chatInputChange(event: Event) {
+    const inputElement = event.target as HTMLTextAreaElement;
+    this.charCount = inputElement.value.length;
+  }
+
+  private dateDiffInDays(a: Date, b: Date): number {
+    const date1 = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+    const date2 = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+
+    const timeDifference = Math.abs(date1.getTime() - date2.getTime());
+    const msPerDay = 24 * 60 * 60 * 1000;
+
+    return Math.ceil(timeDifference / msPerDay);
+  }
+
+  private receiveChatMessage(timestamp: Date, userId: string, username: string, message: string) {
     const container = document.getElementById("chat-messages")!;
-    const containsPing = new RegExp("\\b" + "@").test(message)
-    if (containsPing) {
-      const indices = this.getAllIndices(message, "@");
-      for (var i = 0; i < indices.length; i++) {
-
-      }
-    }
-
     const messageElement = document.createElement("div");
+    const timeSpan = document.createElement("span");
     const usernameSpan = document.createElement("span");
     const messageSpan = document.createElement("span");
 
+    let content;
+    const date = new Date(timestamp);
+    const difference = this.dateDiffInDays(new Date(), date);
+
+    if (difference == 0) {
+      content = date.getHours().toString().padStart(2, "0") + ":" + date.getMinutes().toString().padStart(2, "0");
+    }
+    else if (difference == 1) {
+      content = "Yesterday";
+    }
+    else {
+      return;
+    }
+
+    timeSpan.textContent = content + " - ";
+    timeSpan.style.color = "gray";
+    timeSpan.classList.add('disable-selection');
+
     usernameSpan.textContent = username + ": ";
     usernameSpan.style.fontWeight = "700";
-    usernameSpan.style.color = this.getUsernameColor(username)
-    messageSpan.textContent = message;
+    usernameSpan.style.color = this.getUsernameColor(userId);
+    usernameSpan.style.cursor = "pointer";
+    usernameSpan.classList.add('disable-selection');
 
+    usernameSpan.addEventListener("pointerdown", () => {
+      const message = document.getElementById("chat-input") as HTMLInputElement;
+      const prefix = message.value.length == 0 ? "@" : " @";
+      message.value += prefix + username;
+      this.charCount = message.value.length;
+    });
+
+
+    // Find and style mention in the message
+    const pingRegex = /(?<!\S)@([a-zA-Z0-9]+)(?![a-zA-Z0-9])/g;
+    const audio = new Audio("assets/sfx/notification.mp3");
+
+    const formattedMessage = message.replace(pingRegex, (match) => {
+      const gotMentioned = match.substring(1) == this.username;
+      if (gotMentioned) {
+        messageElement.style.backgroundColor = "#FFDDDB"
+
+        if (this.signalRService.getState() == "Connected") //Only play sound when message was received via hub, not from server message history
+          audio.play();
+
+
+        const targetDiv = document.getElementById('chat-container');
+        if (targetDiv != document.activeElement && !targetDiv?.contains(document.activeElement)) {
+          this.mentionCount++;
+          const plural = this.mentionCount - 1 ? "s" : "";
+          document.title = `Open Place (${this.mentionCount} mention${plural})`;
+        }
+      }
+      const color = gotMentioned ? "red" : "blue";
+      return `<span style="font-weight: 600; color: ${color}">${match}</span>`;
+    });
+    messageSpan.innerHTML = formattedMessage;
+    messageElement.appendChild(timeSpan);
     messageElement.appendChild(usernameSpan);
     messageElement.appendChild(messageSpan);
 
     messageElement.style.fontSize = "18px";
     messageElement.style.padding = "5px";
     messageElement.style.margin = "5px 0";
-    messageElement.style.backgroundColor = "#f1f1f1";
     messageElement.style.borderRadius = "5px";
 
+    // Append the message element to the container and scroll to the bottom
     container.appendChild(messageElement);
     container.scrollTop = container.scrollHeight;
   }
 
+
+  //private highlightMentions(element: HTMLElement): void {
+  //  const pingRegex = /(?<!\S)@([a-zA-Z0-9]+)/g;
+
+  //  // Save the current selection and cursor position
+  //  const sel = window.getSelection();
+  //  const range = sel!.rangeCount > 0 ? sel!.getRangeAt(0) : null;
+  //  const currentOffset = range ? range.startOffset : 0;
+
+  //  // Create a temporary div to hold the formatted content
+  //  const tempDiv = document.createElement('div');
+  //  let lastIndex = 0;
+  //  let match: RegExpExecArray | null;
+
+  //  // Replace mentions while preserving other text
+  //  while ((match = pingRegex.exec(element.innerText)) !== null) {
+  //    // Append text before the mention
+  //    tempDiv.appendChild(document.createTextNode(element.innerText.substring(lastIndex, match.index)));
+
+  //    // Create a span for the mention
+  //    const mentionSpan = document.createElement('span');
+  //    mentionSpan.style.fontWeight = '600';
+  //    mentionSpan.style.color = 'blue';
+  //    mentionSpan.textContent = match[0]; // Use the matched mention
+  //    tempDiv.appendChild(mentionSpan);
+
+  //    lastIndex = match.index + match[0].length;
+  //  }
+
+  //  // Append any remaining text after the last mention
+  //  tempDiv.appendChild(document.createTextNode(element.innerText.substring(lastIndex)));
+
+  //  // Clear the original element and append the new content
+  //  element.innerHTML = ''; // Clear using innerHTML for better performance
+  //  element.appendChild(tempDiv);
+
+  //  // Restore the cursor position
+  //  if (sel && range) {
+  //    const newRange = document.createRange();
+  //    let adjustedOffset = currentOffset;
+
+  //    // Find the new cursor position
+  //    tempDiv.childNodes.forEach((child) => {
+  //      if (child.nodeType === Node.TEXT_NODE) {
+  //        if (adjustedOffset <= child.textContent!.length) {
+  //          newRange.setStart(child, adjustedOffset);
+  //          newRange.collapse(true);
+  //          return; // Exit the forEach loop early
+  //        }
+  //        adjustedOffset -= child.textContent!.length;
+  //      } else if (child.nodeType === Node.ELEMENT_NODE) {
+  //        const spanLength = child.textContent!.length;
+  //        if (adjustedOffset <= spanLength) {
+  //          newRange.setStartAfter(child);
+  //          newRange.collapse(true);
+  //          return; // Exit the forEach loop early
+  //        }
+  //        adjustedOffset -= spanLength;
+  //      }
+  //    });
+
+  //    // Adjust the range to the appropriate position if needed
+  //    if (adjustedOffset > 0) {
+  //      newRange.setStart(tempDiv, tempDiv.childNodes.length); // Set to the end if out of bounds
+  //    }
+
+  //    // Restore the selection
+  //    sel.removeAllRanges();
+  //    sel.addRange(newRange);
+  //  }
+  //}
+
   public chatInputKeydown(event: KeyboardEvent) {
     if (event.key == 'Enter') {
+      event.preventDefault(); //Do not allow multiple lines
       this.sendChatMessage();
     }
   }
@@ -331,36 +497,78 @@ export class HomeComponent implements OnInit {
     div.classList.toggle("hidden");
   }
 
-  private getUsernameColor(username: string) {
+  private getUsernameColor(id: string) {
     const colors = ["#DC143C", "#4169E1", "#3CB371", "#DAA520", "#6A5ACD", "#FF6347", "#FF8C00",
       "#9370DB", "#008080", "#4682B4", "#9932CC", "#FF7F50", "#228B22", "#FF1493", "#708090"];
 
-    let number = 0;
-    for (var i = 0; i < username.length; i++) {
-      number += username.charCodeAt(i);
+    if (this.takenColors.has(id)) {
+      return this.takenColors.get(id)!;
     }
-    return colors[number % colors.length];
+
+    // Delete the first entry if all colors are taken
+    if (this.takenColors.size == colors.length) {
+      const firstKey = this.takenColors.keys().next().value;
+      this.takenColors.delete(firstKey);
+    }
+
+    const availableColors = colors.filter(color => !Array.from(this.takenColors.values()).includes(color));
+
+    let sum = 0;
+    for (var i = 0; i < id.length; i++) {
+      sum += id.charCodeAt(i);
+    }
+
+    const color = availableColors[sum % availableColors.length];
+    this.takenColors.set(id, color);
+
+    return color;
   }
 
   public async sendChatMessage() {
+
     const message = document.getElementById("chat-input") as HTMLInputElement;
+    const input = message.value;
+
+    //Check for empty input
+    if (!input.trim()) {
+      return;
+    }
+    else if (input.length > this.maxMessageLength) {
+      return;
+    }
+    message.value = "";
+    this.charCount = 0;
+
     const result = await fetch(environment.endpointUrl + "/Message", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username: this.username, message: message.value })
+      body: JSON.stringify({ username: this.username, message: input, userId: this.id })
     });
-    if (result.ok) {
-      message.value = "";
+
+    if (result.status === 429) {
+      message.value = input;
+      this.charCount = input.length;
+
+      this.waitForNextFrame().then(() => alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`));
     }
-    else if (result.status === 429) {
-      alert(`Wait ${result.headers.get("retry-after")} seconds before sending a message.`)
-    }
-    else {
+    else if (!result.ok) {
+      message.value = input;
+      this.charCount = input.length;
+
       const response = await result.text();
-      alert(response);
+
+      //Check for empty response
+      if (response.trim()) {
+        this.waitForNextFrame().then(() => alert(response));
+      }
     }
+
+  }
+
+  private waitForNextFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }
 
   private receivePixel(receivedPixel: any) {
@@ -424,10 +632,10 @@ export class HomeComponent implements OnInit {
       const pan = this.panzoom.getPan();
       const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
 
-      const tolerance = 1; //Adjustment may be needed
+      const tolerance = 0.1;
 
-      const xMatch = Math.abs(Math.round(pan.x) - stored.x) <= tolerance;
-      const yMatch = Math.abs(Math.round(pan.y) - stored.y) <= tolerance;
+      const xMatch = Math.abs(pan.x - stored.x) <= tolerance;
+      const yMatch = Math.abs(pan.y - stored.y) <= tolerance;
       if (xMatch && yMatch) {
         this.colorPicker(e);
       }
@@ -667,7 +875,7 @@ export class HomeComponent implements OnInit {
     const x = this.calculateXPosition(e.clientX, rect);
     const y = this.calculateYPosition(e.clientY, rect);
     const pixel = this.findLatestPixel(x, y);
-    if (!isDevMode()) {
+    if (e.shiftKey || e.altKey || e.ctrlKey) {
       console.log(pixel);
     }
     this.drawHoverPixel(x, y, pixel?.c, pixel?.p, false);
@@ -1022,7 +1230,7 @@ export class HomeComponent implements OnInit {
 
   public usernameChange(event: Event) {
     const val = (event.target as HTMLInputElement).value
-    if (val.length > 16) {
+    if (val.length > this.maxUsernameLength) {
       (event.target as HTMLInputElement).value = this.username;
       alert("Username cannot be longer than 16 characters.");
       return;
@@ -1068,10 +1276,10 @@ export class HomeComponent implements OnInit {
 
   private savePanzoomState() {
     const pan = this.panzoom.getPan();
-    const x = Math.round(pan.x);
-    const y = Math.round(pan.y);
+    const x = pan.x;
+    const y = pan.y;
 
-    const scale = Math.round(this.panzoom.getScale());
+    const scale = this.panzoom.getScale();
 
     // If there are no changes then the operation should be canceled.
     const map = this.route.snapshot.queryParamMap;
@@ -1084,7 +1292,7 @@ export class HomeComponent implements OnInit {
 
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { x: x, y: y, scale: scale },
+      queryParams: { x: Math.round(x), y: Math.round(y), scale: Math.round(scale) },
       queryParamsHandling: 'merge'
     });
   }

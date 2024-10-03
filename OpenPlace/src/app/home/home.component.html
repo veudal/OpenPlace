@@ -4,7 +4,7 @@
 <body class="min-h-screen body p-2">
   <div>
     <div class="container">
-      <div id="chat-container">
+      <div (mouseover)="onMouseOver()" id="chat-container">
         <div id="chat-window">
           <div class="disable-selection" id="chat-header">
             Public Chat
@@ -14,8 +14,9 @@
             </div>
           </div>
           <div id="chat-messages"></div>
-          <input type="text" autocomplete="off" id="chat-input" (keydown)="chatInputKeydown($event)" placeholder="Type a message..." />
-          <button id="send-btn" (click)="sendChatMessage()">Send</button>
+          <textarea type="text" spellcheck="false" id="chat-input" (input)=chatInputChange($event) (keydown)="chatInputKeydown($event)" placeholder="Mention users with @"></textarea>
+          <button class="disable-selection" id="send-btn" (click)="sendChatMessage()">Send</button>
+          <div class="char-count disable-selection" [ngStyle]="charCount > maxMessageLength ? { 'color': 'red', 'font-weight': '900' } : { 'color': 'gray', 'font-weight': 'normal' }">{{charCount}}/{{maxMessageLength}}</div>
         </div>
         <button (click)="chatArrowClick()" class="disable-selection" id="chat-arrow">&#9664;</button>
       </div>
@@ -42,7 +43,7 @@
           </div>
         </div>
       </div>
-      <span id="bubble" class="text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
+      <span id="bubble" class="disable-selection text-center bg-red-400 font-bold text-white rounded transition py-1 px-2 animate-[showoff_100ms_ease-in]" style="position: absolute; white-space: nowrap; touch-action: manipulation; visibility: hidden;"></span>
       <div>
         <div class="w-full max-w-sm p-6 bg-white rounded-lg shadow-md username-input-container">
           <label for="username" class="block text-gray-700 text-sm font-medium mb-2">Username</label>
