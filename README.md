@@ -47,7 +47,7 @@ Before creating anything, please read our [canvas guidelines](https://github.com
 - Slider to see every pixel change from the beginning
 - Chat with other users
 - Realtime updates from other users
-- - Usernames
+- Usernames
 - Canvas zoom
 - Keyboard shortcuts for zoom (- & +)
 - Automatic zoom and position recovery on opening
