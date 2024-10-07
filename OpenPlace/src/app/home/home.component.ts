@@ -36,6 +36,7 @@ export class HomeComponent implements OnInit {
   id: string = "";
   takenColors: Map<string, string> = new Map();
   mentionCount = 0;
+  isChatHiddenByScript = false;
 
   timeoutId: number | null = null;
   audio: HTMLAudioElement = new Audio("assets/sfx/place.mp3");
@@ -117,6 +118,19 @@ export class HomeComponent implements OnInit {
     this.initPaletteContainer();
     this.initColorPicker();
     this.initLocale();
+    this.initSliderUpdate();
+  }
+
+  private initSliderUpdate() {
+    // This method is needed in order to update the relative time info on the slider
+    setInterval(() => {
+      const currentValue = this.sliderValue;
+      this.sliderValue = currentValue + 1;
+
+      setTimeout(() => {
+        this.sliderValue = currentValue;
+      }, 100);
+    }, 30000); // Update every 30 seconds
   }
 
   private initConfiguration() {
@@ -129,6 +143,11 @@ export class HomeComponent implements OnInit {
 
         this.restoreLast20Messages(data.messages);
       })
+      .catch((response) => {
+        if (!response.ok) {
+          alert("This site is currently under maintenance.");
+        }
+      });
   }
 
   private restoreLast20Messages(messages: any) {
@@ -191,7 +210,7 @@ export class HomeComponent implements OnInit {
         preview: true,
         opacity: false,
         hue: true,
-
+        
         interaction: {
           hex: true,
           rgba: true,
@@ -205,6 +224,11 @@ export class HomeComponent implements OnInit {
 
     this.pickr.on("hide", () => {
       this.pickr?.applyColor();
+      if (this.isChatHiddenByScript) {
+        const div = document.getElementById("chat-container") as HTMLDivElement;
+        div.classList.remove("hidden");
+        this.isChatHiddenByScript = false;
+      }
     })
 
     this.pickr.on('change', (color: any) => {
@@ -254,20 +278,34 @@ export class HomeComponent implements OnInit {
 
     this.colorPalette.forEach((color, i) => {
       const colorDiv = document.createElement('div') as HTMLDivElement;
-      colorDiv.style.width = '35px';
-      colorDiv.style.height = '35px';
+
+      // First color (larger, aligned to the left)
+      if (i == 0) {
+        colorDiv.style.width = '60px';
+        colorDiv.style.height = '60px';
+        colorDiv.style.position = 'absolute';
+        colorDiv.style.top = '23%';
+        colorDiv.style.left = '3%';    
+      }
+      // Remaining colors (normal grid)
+      else {
+        colorDiv.style.width = '35px';
+        colorDiv.style.height = '35px';
+        colorDiv.style.marginLeft = '50px';
+      }
+
       colorDiv.style.backgroundColor = `#${color}`;
       colorDiv.style.borderRadius = '20%';
       colorDiv.style.cursor = 'pointer';
       colorDiv.style.transition = 'transform 0.2s ease';
       colorDiv.style.border = '2px solid #ffffff';
-      colorDiv.style.display = 'inline-block';
       colorDiv.id = i.toString() + "-color";
 
       if (i == this.selectedColor) {
         colorDiv.style.transform = 'scale(1.3)';
         colorDiv.style.border = '3px solid #0080FF';
       }
+
 
       colorDiv.addEventListener('click', () => this.handleColorDivClick(colorDiv));
       colorDiv.addEventListener('mouseover', () => colorDiv.style.transform = 'scale(1.3)');
@@ -282,6 +320,11 @@ export class HomeComponent implements OnInit {
     this.updatePaletteSelection(null, index);
 
     if (this.selectedColor == 0) {
+      const div = document.getElementById("chat-container") as HTMLDivElement;
+      if (!div.classList.contains("hidden")) {
+        div.classList.add("hidden");
+        this.isChatHiddenByScript = true;
+      }
       this.pickr?.show();
     }
   }
@@ -384,9 +427,9 @@ export class HomeComponent implements OnInit {
       if (gotMentioned) {
         messageElement.style.backgroundColor = "#FFDDDB"
 
-        if (this.signalRService.getState() == "Connected") //Only play sound when message was received via hub, not from server message history
+        if (this.signalRService.getState() == "Connected") { //Only play sound when message was received via hub, not from server message history
           audio.play();
-
+        }
 
         const targetDiv = document.getElementById('chat-container');
         if (targetDiv != document.activeElement && !targetDiv?.contains(document.activeElement)) {
@@ -632,7 +675,7 @@ export class HomeComponent implements OnInit {
       const pan = this.panzoom.getPan();
       const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
 
-      const tolerance = 0.1;
+      const tolerance = 0.5;
 
       const xMatch = Math.abs(pan.x - stored.x) <= tolerance;
       const yMatch = Math.abs(pan.y - stored.y) <= tolerance;
@@ -894,19 +937,17 @@ export class HomeComponent implements OnInit {
 
   private getLocalDate(date: string) {
     let timestamp = moment.utc(date).local();
-
+    timestamp.set
     if (moment.utc().diff(timestamp, 'hours') < 24) {
-      return timestamp.fromNow();
+      return timestamp.add(-1, "seconds").fromNow(); //-1 second to ensure that the timestamp is not in the future
     } else {
       return timestamp.format("l") + " " + timestamp.format('LT');
     }
   }
 
   private findLatestPixel(x: number, y: number) {
-    let max = this.boardArr.length;
-    if (this.isBoardLoaded) {
-      max = this.sliderValue;
-    }
+    const max = this.isBoardLoaded ? this.sliderValue : this.boardArr.length;
+
     for (let i = max - 1; i >= 0; i--) {
       const item = this.boardArr[i];
       if ((!this.userFilter || this.userFilter == item.p) && item.x === x && item.y === y) {
@@ -995,10 +1036,6 @@ export class HomeComponent implements OnInit {
     try {
       //do {
       const result = await this.fetchWithProgress(environment.endpointUrl + `/Board`);
-      if (!result.ok) {
-        alert("This site is currently under maintenance.");
-        return;
-      }
       const websocketPixels = this.boardArr;
       this.boardArr = await result.json();
       this.boardArr = this.boardArr.concat(websocketPixels);
@@ -1249,9 +1286,8 @@ export class HomeComponent implements OnInit {
     if (e.shiftKey || e.ctrlKey || e.altKey) {
       return;
     }
-    this.panzoom.zoomWithWheel(e, { animate: true });
+    this.panzoom.zoomWithWheel(e, { animate: false });
     this.savePanzoomState();
-
     //this.updateGrid();
 
   }
@@ -1304,7 +1340,7 @@ export class HomeComponent implements OnInit {
     }
     const state = JSON.parse(savedState);
     this.panzoom.zoom(state.scale);
-    setTimeout(() => this.panzoom.pan(state.x, state.y))
+    setTimeout(() => this.panzoom.pan(state.x, state.y), 200)
   }
 
   private updatePanZoomFromParams(params: Params) {
@@ -1315,8 +1351,12 @@ export class HomeComponent implements OnInit {
 
     let { x, y, scale } = params;
 
+    if (isNaN(x) || isNaN(y) || isNaN(scale)) {
+      return;
+    }
+
     if (x && y && scale) {
-      localStorage.setItem('panzoomState', JSON.stringify({ x: x || 0, y: y || 0, scale: scale || 1 }));
+      localStorage.setItem('panzoomState', JSON.stringify({ x, y, scale }));
     }
     else {
       const stored: ViewSettings = JSON.parse(localStorage.getItem("panzoomState") || "{}");
@@ -1325,7 +1365,7 @@ export class HomeComponent implements OnInit {
 
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { x: x, y: y, scale: scale },
+      queryParams: { x: Math.round(x), y: Math.round(y), scale: Math.round(scale) },
     });
     this.restorePanzoomState();
   }
